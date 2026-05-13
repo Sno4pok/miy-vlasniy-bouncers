@@ -1,0 +1,29 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Require the voting module
+local VotingModule = require(ReplicatedStorage:WaitForChild("VotingModule"))
+
+-- Get references
+local voteEvent = ReplicatedStorage:WaitForChild("VoteEvent")
+local gameModeValue = ReplicatedStorage:WaitForChild("GameMode")
+local voteResultsFolder = ReplicatedStorage:WaitForChild("VoteResults")
+local inRound = ReplicatedStorage:WaitForChild("InRound")
+local status = ReplicatedStorage:WaitForChild("Status")
+
+-- Initialize the module with dependencies
+VotingModule.Initialize({
+	voteEvent = voteEvent,
+	status = status,
+	gameModeValue = gameModeValue,
+	inRound = inRound,
+	voteResultsFolder = voteResultsFolder
+})
+
+-- Handle vote requests from clients
+voteEvent.OnServerEvent:Connect(function(player, action, data)
+	if action == "vote" then
+		VotingModule.HandleVoteRequest(player, data)
+	end
+end)
+
+print("Voting system initialized (using ModuleScript)")
