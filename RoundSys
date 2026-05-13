@@ -1,0 +1,157 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Teams = game:GetService("Teams")
+
+-- Require the voting module
+local VotingModule = require(ReplicatedStorage:WaitForChild("VotingModule"))
+
+local intermission = 20
+local roundLenght = 300
+
+local inRound = ReplicatedStorage:WaitForChild("InRound")
+local status = ReplicatedStorage:WaitForChild("Status")
+local gameModeValue = ReplicatedStorage:WaitForChild("GameMode")
+
+local playingTeam = Teams.Playing
+local lobbyTeam = Teams.Lobby
+
+-- Game mode modules
+local GameModes = ReplicatedStorage:WaitForChild("GameModes")
+local ClassicMode = require(GameModes:WaitForChild("ClassicMode"))
+local TeamDeathMatch = require(GameModes:WaitForChild("TeamDeathMatch"))
+local InsanityMode = require(GameModes:WaitForChild("InsanityMode"))
+
+local currentGameMode = nil
+local teams = {
+	Playing = playingTeam,
+	Lobby = lobbyTeam
+}
+
+-- Handle player leaving during round
+Players.PlayerRemoving:Connect(function(player)
+	if inRound.Value == true and currentGameMode then
+		local winType, winMessage = currentGameMode:CheckWinCondition(Players:GetPlayers())
+		if winType then
+			status.Value = winMessage
+			inRound.Value = false
+			task.wait(3)
+		end
+	end
+end)
+
+inRound.Changed:Connect(function()
+	
+	if inRound.Value == true then
+		-- Get current game mode
+		local modeName = gameModeValue.Value
+		if modeName == "Classic" then
+			currentGameMode = ClassicMode
+		elseif modeName == "Team Death Match" then
+			currentGameMode = TeamDeathMatch
+		elseif modeName == "Insanity" then
+			currentGameMode = InsanityMode
+		end
+		
+		-- Setup teams for game mode
+		currentGameMode:SetupTeams(teams)
+		
+		-- Move players to game
+		for i, plr in pairs(Players:GetChildren()) do
+			
+			if not plr:FindFirstChild("IsAFK") then
+				
+				local char = plr.Character
+				if char then
+					local humRoot = char:FindFirstChild("HumanoidRootPart")
+					if humRoot then
+						humRoot.CFrame = game.Workspace.GameSpawn.CFrame
+					end
+
+					-- Assign teams based on game mode
+					if currentGameMode.Name == "Team Death Match" then
+						currentGameMode:AssignTeams(Players:GetPlayers())
+					else
+						plr.Team = playingTeam
+					end
+
+					-- Handle death
+					local humanoid = char:FindFirstChild("Humanoid")
+					if humanoid then
+						humanoid.Died:Connect(function()
+							currentGameMode:OnPlayerDeath(plr, teams)
+						end)
+					end
+				end
+				
+			end
+			
+			
+		end
+			
+	else	
+		-- Round ended, move everyone to lobby
+		currentGameMode = nil
+		for i, plr in pairs(Players:GetChildren()) do
+
+			local char = plr.Character
+			if char then
+				local humRoot = char:FindFirstChild("HumanoidRootPart")
+				if humRoot then
+					humRoot.CFrame = game.Workspace.lobbySpawn.CFrame
+				end
+			end
+		
+			plr.Team = lobbyTeam
+
+		end
+	end 
+	
+end)
+
+local function round()
+	
+	while true do 
+		
+		inRound.Value = false
+		
+		-- INTERMISSION PHASE - Always show intermission first
+		for i = intermission, 0, -1 do 
+			status.Value = "Intermission: "..i.." seconds"
+			task.wait(1)
+		end
+		
+		-- VOTING PHASE - Start voting after intermission
+		VotingModule.StartVoting()
+		
+		-- Wait for round to start (voting system will set inRound to true)
+		while not inRound.Value do
+			task.wait(0.5)
+		end
+		
+		-- Wait for players to be moved
+		task.wait(1)
+		
+		-- Main round loop
+		for i = roundLenght, 0, -1 do 
+
+			status.Value = ""
+
+			-- Check win condition based on game mode
+			if currentGameMode then
+				local winType, winMessage = currentGameMode:CheckWinCondition(Players:GetPlayers())
+				
+				if winType then
+					status.Value = winMessage
+					inRound.Value = false
+					task.wait(3)
+					break
+				end
+			end
+
+			task.wait(1)
+		end
+		
+	end
+end
+
+task.spawn(round)
