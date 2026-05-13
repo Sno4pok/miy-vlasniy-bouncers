@@ -1,0 +1,54 @@
+local RewardManager = {}
+
+-- Configuration: Reward amounts
+RewardManager.CashPerWin = 100
+RewardManager.WinsPerWin = 1
+
+-- Award Cash to a player
+function RewardManager.AwardCash(player, amount)
+	if not player then return false end
+	
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then return false end
+	
+	local cash = leaderstats:FindFirstChild("Cash")
+	if not cash then return false end
+	
+	cash.Value += amount
+	return true
+end
+
+-- Award Wins to a player
+function RewardManager.AwardWins(player, amount)
+	if not player then return false end
+	
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then return false end
+	
+	local wins = leaderstats:FindFirstChild("Wins")
+	if not wins then return false end
+	
+	wins.Value += amount
+	return true
+end
+
+-- Convenience function: Award for a win (Cash + Wins)
+function RewardManager.AwardForWin(player)
+	RewardManager.AwardCash(player, RewardManager.CashPerWin)
+	RewardManager.AwardWins(player, RewardManager.WinsPerWin)
+end
+
+-- Get a player's current stats
+function RewardManager.GetStats(player)
+	if not player then return nil end
+	
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then return nil end
+	
+	return {
+		Cash = leaderstats:FindFirstChild("Cash") and leaderstats.Cash.Value or 0,
+		Wins = leaderstats:FindFirstChild("Wins") and leaderstats.Wins.Value or 0
+	}
+end
+
+return RewardManager
