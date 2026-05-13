@@ -1,0 +1,94 @@
+--Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--Folders
+local Configs = ReplicatedStorage.Configs
+local Remotes = ReplicatedStorage.CustomiseRelatedRemotes
+local CratesFolder = ReplicatedStorage.Crates
+local BatsFolder = ReplicatedStorage.Bats
+
+--Modules
+local Crates = require(Configs.Crates)
+local Bats = require(Configs.Bats)
+
+--Tables
+local cratesBeingOpened = {}
+
+function getRandomBat(plr:Player)
+	local crateType = cratesBeingOpened[plr.UserId]
+	if not crateType then return end
+	
+	local pool = Bats[crateType]
+	if not pool then return end
+	
+	local totalWeight = 0
+	for _, data in pairs(pool) do
+		totalWeight += data.Weight
+	end
+	
+	local roll = math.random(1, totalWeight)
+	local current = 0
+	for name, data in pairs(pool) do
+		current += data.Weight
+		if roll <= current then
+			local batsTypeFolder = BatsFolder:FindFirstChild(crateType)
+			if not batsTypeFolder then return end
+			
+			local batObject = batsTypeFolder:FindFirstChild(name)
+			return batObject
+		end
+	end
+end
+
+
+Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
+	--Checking if is opening
+	local isOpening = plr:FindFirstChild("IsOpening")
+	if isOpening.Value == true then return end
+	
+	--Checking
+	local leaderstats = plr:FindFirstChild("leaderstats")
+	if not leaderstats then return end
+	
+	local crateInfo = Crates[crateType]
+	if not crateInfo then return end
+	
+	local currencyStat = leaderstats:FindFirstChild(crateInfo.Currency)
+	if not currencyStat or currencyStat.Value < crateInfo.Amount then return end
+	
+	local crateToClone = CratesFolder:FindFirstChild(crateType .. "Crate")
+	if not crateToClone then return end
+	
+	--Deducting
+	currencyStat.Value -= crateInfo.Amount
+	
+	--Opening
+	isOpening.Value = true
+	
+	cratesBeingOpened[plr.UserId] = crateType
+	
+	return crateToClone
+end
+
+Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
+	local bat = getRandomBat(plr)
+	
+	local playerBats = plr:WaitForChild("Bats")
+	local batValue = Instance.new("BoolValue")
+	batValue.Value = true
+	batValue.Parent = playerBats
+	
+	if bat then
+		print("Player got:", bat)
+		batValue.Name = bat.Name
+	else
+		warn("Error getting bat, giving red instead")
+		batValue.Name = "Red"
+	end
+	
+	local isOpening = plr:FindFirstChild("IsOpening")
+	isOpening.Value = false
+	cratesBeingOpened[plr.UserId] = nil
+	Remotes.LoadInventory:Fire(plr, playerBats)
+end)
+
