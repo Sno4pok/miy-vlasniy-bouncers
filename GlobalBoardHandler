@@ -1,0 +1,125 @@
+local DataStore = game:GetService("DataStoreService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local OrderedStores = {}
+
+local UPDATE_INTERVAL = 90
+local MAX_ROWS = 100
+local ROW_TEMPLATE = ReplicatedStorage:WaitForChild("LeaderboardRow")
+
+function GetOrderedDataStore(currencyName)
+	if not OrderedStores[currencyName] then
+		OrderedStores[currencyName] = DataStore:GetOrderedDataStore(currencyName .. "Leaderboard")
+	end
+	return OrderedStores[currencyName]
+end
+
+function clearLeaderboard(gui)
+	for _, child in ipairs(gui.DataContent:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+end
+
+function updateLeaderboard(leaderboardModel)
+	local background = leaderboardModel:WaitForChild("Background")
+	local surfaceGui = background:WaitForChild("SurfaceGui")
+	local currencyName = leaderboardModel:WaitForChild("Currency").Value
+	local folderName = leaderboardModel:WaitForChild("FolderName").Value
+	
+	
+	local store = GetOrderedDataStore(currencyName)
+	
+	local success, pages = pcall(function()
+		return store:GetSortedAsync(false, MAX_ROWS)
+	end)
+	
+	if not success then
+		warn("Failed to fetch leaderboard for", currencyName)
+		return
+	end
+	clearLeaderboard(surfaceGui)
+	
+	local currentPage = pages:GetCurrentPage()
+	
+	for rank, entry in ipairs(currentPage) do
+		local userId = tonumber(entry.key)
+		local value = entry.value
+		
+		local userName = "Unknown"
+		pcall(function()
+			userName = Players:GetNameFromUserIdAsync(userId)
+		end)
+		
+		local row = ROW_TEMPLATE:Clone()
+		row.PlayerLabel.Text = userName
+		row.CurrencyLabel.Text = value
+		row.RankLabel.Text = "#" .. rank
+		
+		if rank == 1 then
+			row.PlayerLabel.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+			row.CurrencyLabel.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+			row.RankLabel.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+			
+		elseif rank == 2 then
+			row.PlayerLabel.BackgroundColor3 = Color3.fromRGB(136, 132, 130)
+			row.CurrencyLabel.BackgroundColor3 = Color3.fromRGB(136, 132, 130)
+			row.RankLabel.BackgroundColor3 = Color3.fromRGB(136, 132, 130)
+			
+		elseif rank == 3 then
+			row.PlayerLabel.BackgroundColor3 = Color3.fromRGB(205, 127, 50)
+			row.CurrencyLabel.BackgroundColor3 = Color3.fromRGB(205, 127, 50)
+			row.RankLabel.BackgroundColor3 = Color3.fromRGB(205, 127, 50)
+		end
+		row.LayoutOrder = rank
+		row.Parent = surfaceGui.DataContent
+	end
+	
+end
+
+
+function saveAllPlayers()
+	for _, player in ipairs(Players:GetPlayers()) do
+		for _, leaderboardModel in ipairs(workspace.Leaderboards:GetChildren()) do
+			if string.match(leaderboardModel.Name, "Leaderboard") 
+				and leaderboardModel:FindFirstChild("Currency") 
+				and leaderboardModel:FindFirstChild("FolderName") then
+				
+				local currency = leaderboardModel.Currency.Value
+				local folderName = leaderboardModel.FolderName.Value
+				
+				local statsFolder = player:FindFirstChild(folderName)
+				if not statsFolder then continue end
+				
+				local stat = statsFolder:FindFirstChild(currency)
+				if not stat then continue end
+				
+				local orderedStore = GetOrderedDataStore(currency)
+				
+				pcall(function()
+					orderedStore:SetAsync(player.UserId, stat.Value)
+				end)
+				
+			end
+		end
+	end
+end
+
+
+
+while true do
+	saveAllPlayers()
+	for _, leaderboardModel in ipairs(workspace.Leaderboards:GetChildren()) do
+		if string.match(leaderboardModel.Name, "Leaderboard") 
+			and leaderboardModel:FindFirstChild("Currency") 
+			and leaderboardModel:FindFirstChild("FolderName") 
+			and leaderboardModel:FindFirstChild("Background")
+			and leaderboardModel.Background:FindFirstChild("SurfaceGui") then
+			updateLeaderboard(leaderboardModel)
+		end
+	end	
+	print("All leaderboards updated")
+	task.wait(UPDATE_INTERVAL)
+end
