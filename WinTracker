@@ -1,0 +1,155 @@
+local Players = game:GetService("Players")
+local Teams = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RewardManager = require(script.Parent:WaitForChild("RewardManager"))
+
+-- Game mode configuration
+local GAME_MODE = "FFA" -- Options: "FFA" (Free-for-All) or "TeamDeathmatch"
+local MIN_PLAYERS_TO_START = 2 -- Minimum players needed to track wins
+
+-- Track alive players
+local alivePlayers = {}
+local gameInProgress = false
+
+-- Create RemoteEvent to notify clients of game state
+local gameStateEvent = Instance.new("RemoteEvent")
+gameStateEvent.Name = "GameStateEvent"
+gameStateEvent.Parent = ReplicatedStorage
+
+-- Get all alive players
+local function getAlivePlayers()
+	local alive = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character and player.Character:FindFirstChild("Humanoid") then
+			local humanoid = player.Character.Humanoid
+			if humanoid.Health > 0 then
+				table.insert(alive, player)
+			end
+		end
+	end
+	return alive
+end
+
+-- Get alive players by team
+local function getAlivePlayersByTeam()
+	local teams = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character and player.Character:FindFirstChild("Humanoid") then
+			local humanoid = player.Character.Humanoid
+			if humanoid.Health > 0 and player.Team then
+				local teamName = player.Team.Name
+				if not teams[teamName] then
+					teams[teamName] = {}
+				end
+				table.insert(teams[teamName], player)
+			end
+		end
+	end
+	return teams
+end
+
+-- Check win condition
+local function checkWinCondition()
+	local totalPlayers = #Players:GetPlayers()
+	
+	if totalPlayers < MIN_PLAYERS_TO_START then
+		return -- Not enough players to determine a winner
+	end
+	
+	if GAME_MODE == "FFA" then
+		-- Free-for-All: Last player standing wins
+		local alive = getAlivePlayers()
+		
+		if #alive == 1 then
+			local winner = alive[1]
+			RewardManager.AwardForWin(winner)
+			print(winner.Name .. " wins the game (Last Player Standing)!")
+			gameStateEvent:FireAllClients("Winner", winner.Name)
+			return winner
+		elseif #alive == 0 and totalPlayers >= MIN_PLAYERS_TO_START then
+			-- All players died at once (rare case)
+			print("Draw - No survivors!")
+			gameStateEvent:FireAllClients("Draw")
+			return nil
+		end
+		
+	elseif GAME_MODE == "TeamDeathmatch" then
+		-- Team Deathmatch: Last team standing wins
+		local teamsAlive = getAlivePlayersByTeam()
+		local teamCount = 0
+		local lastTeam = nil
+		
+		for teamName, players in pairs(teamsAlive) do
+			if #players > 0 then
+				teamCount = teamCount + 1
+				lastTeam = teamName
+			end
+		end
+		
+		if teamCount == 1 and totalPlayers >= MIN_PLAYERS_TO_START then
+			-- One team remains - award wins to all team members
+			local winningTeam = Teams:FindFirstChild(lastTeam)
+			if winningTeam then
+				for _, player in ipairs(Players:GetPlayers()) do
+					if player.Team == winningTeam then
+						RewardManager.AwardForWin(player)
+					end
+				end
+				print(lastTeam .. " team wins the game (Last Team Standing)!")
+				gameStateEvent:FireAllClients("TeamWinner", lastTeam)
+				return winningTeam
+			end
+		end
+	end
+	
+	return nil
+end
+
+-- Track player death
+local function onCharacterDied(player)
+	task.wait(0.1) -- Small delay to ensure death is registered
+	checkWinCondition()
+end
+
+-- Setup character tracking
+local function onCharacterAdded(character, player)
+	local humanoid = character:WaitForChild("Humanoid")
+	
+	humanoid.Died:Connect(function()
+		onCharacterDied(player)
+	end)
+end
+
+local function onPlayerAdded(player)
+	player.CharacterAdded:Connect(function(character)
+		onCharacterAdded(character, player)
+	end)
+	
+	if player.Character then
+		onCharacterAdded(player.Character, player)
+	end
+end
+
+-- Initialize
+Players.PlayerAdded:Connect(onPlayerAdded)
+for _, player in Players:GetPlayers() do
+	onPlayerAdded(player)
+end
+
+print("WinTracker initialized - Mode: " .. GAME_MODE)
+
+-- Export configuration for other scripts to change game mode
+local WinTracker = {}
+
+function WinTracker.SetGameMode(mode)
+	if mode == "FFA" or mode == "TeamDeathmatch" then
+		GAME_MODE = mode
+		print("Game mode changed to: " .. mode)
+	end
+end
+
+function WinTracker.GetGameMode()
+	return GAME_MODE
+end
+
+return WinTracker
