@@ -1,0 +1,23 @@
+local remote = game.ReplicatedStorage.AFK_Stuff:WaitForChild("IsAFK")
+
+remote.OnServerEvent:Connect(function(plr, IsAFK)
+	
+	if IsAFK == "AFK" then
+		
+		local AFKVal = Instance.new("BoolValue")
+		AFKVal.Name = "IsAFK"
+		AFKVal.Parent = plr
+		
+		local AfkGui = game.ReplicatedStorage.AFK_Stuff:WaitForChild("AFK_GUI"):Clone()
+		AfkGui.Parent = plr.Character.Head
+		
+		
+	else
+		
+		plr.IsAFK:Destroy()
+		plr.Character.Head:WaitForChild("AFK_GUI"):Destroy()
+		
+	end
+		
+	
+end)
