@@ -1,0 +1,144 @@
+local DataStoreService = game:GetService("DataStoreService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+-- DataStore for player data
+local playerDataStore = DataStoreService:GetDataStore("PlayerStats_v1")
+
+-- Cache for player data (reduces DataStore calls)
+local playerDataCache = {}
+
+-- Default stats for new players
+local DEFAULT_STATS = {
+	Cash = 0,
+	Wins = 0,
+	Bats = {},
+	EquippedBat = nil
+}
+
+-- Save interval in seconds
+local AUTO_SAVE_INTERVAL = 120 -- Save every 2 minutes
+
+local DataStoreManager = {}
+
+-- Load player data from DataStore
+function DataStoreManager.LoadPlayerData(player)
+	local userId = player.UserId
+	local key = "Player_" .. userId
+	
+	local success, result = pcall(function()
+		return playerDataStore:GetAsync(key)
+	end)
+	
+	if success and result then
+		-- Merge with defaults (in case new stats were added)
+		for statName, defaultValue in pairs(DEFAULT_STATS) do
+			if result[statName] == nil then
+				result[statName] = defaultValue
+				end
+		end
+		playerDataCache[userId] = result
+		return result
+	else
+		-- New player or error - use defaults
+		playerDataCache[userId] = table.clone(DEFAULT_STATS)
+		return playerDataCache[userId]
+	end
+end
+
+-- Save player data to DataStore
+function DataStoreManager.SavePlayerData(player)
+	local userId = player.UserId
+	local key = "Player_" .. userId
+	
+	local data = playerDataCache[userId]
+	if not data then return false end
+	
+	-- Get current values from leaderstats
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if leaderstats then
+		local cash = leaderstats:FindFirstChild("Cash")
+		local wins = leaderstats:FindFirstChild("Wins")
+		
+		if cash then data.Cash = cash.Value end
+		if wins then data.Wins = wins.Value end
+	end
+	
+	-- Get Bats data
+	local batsFolder = player:FindFirstChild("Bats")
+	if batsFolder then
+		local batsData = {}
+		for _, batValue in batsFolder:GetChildren() do
+			if batValue:IsA("BoolValue") then
+				batsData[batValue.Name] = batValue.Value
+			end
+		end
+		data.Bats = batsData
+	end
+	
+	-- Get EquippedBat data
+	local equippedBatValue = player:FindFirstChild("EquippedBat")
+	if equippedBatValue then
+		data.EquippedBat = equippedBatValue.Value
+	end
+	
+	local success, err = pcall(function()
+		playerDataStore:SetAsync(key, data)
+	end)
+	
+	if success then
+		print("Saved data for " .. player.Name)
+		return true
+	else
+		warn("Failed to save data for " .. player.Name .. ": " .. tostring(err))
+		return false
+	end
+end
+
+-- Get cached data (fast, no DataStore call)
+function DataStoreManager.GetCachedData(player)
+	return playerDataCache[player.UserId]
+end
+
+-- Update cache when stats change
+function DataStoreManager.UpdateCache(player, statName, value)
+	local data = playerDataCache[player.UserId]
+	if data then
+		data[statName] = value
+	end
+end
+
+-- Track which players have already been saved (prevents double-saving on shutdown)
+local savedPlayers = {}
+
+-- Save all players (used on game shutdown)
+function DataStoreManager.SaveAllPlayers()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if not savedPlayers[player.UserId] then
+			DataStoreManager.SavePlayerData(player)
+			savedPlayers[player.UserId] = true
+		end
+	end
+end
+
+-- Auto-save loop
+task.spawn(function()
+	while true do
+		task.wait(AUTO_SAVE_INTERVAL)
+		DataStoreManager.SaveAllPlayers()
+		print("Auto-saved all player data")
+	end
+end)
+
+-- Save on game shutdown
+-- Uses task.spawn so saves don't block Studio from closing
+-- task.wait at the end gives saves time to finish before server shuts down
+game:BindToClose(function()
+	task.spawn(DataStoreManager.SaveAllPlayers)
+	-- In Studio, DataStore writes are simulated so a short wait is fine
+	-- In a published game, saves need more time to reach Roblox servers
+	task.wait(RunService:IsStudio() and 0.5 or 3)
+	print("Saved all player data on shutdown")
+end)
+
+return DataStoreManager
