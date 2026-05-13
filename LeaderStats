@@ -1,0 +1,76 @@
+--Services
+local Players = game:GetService("Players")
+local DataStoreManager = require(script.Parent:WaitForChild("DataStoreManager"))
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+
+Players.PlayerAdded:Connect(function(player)
+	-- Create leaderstats folder
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+	
+	-- Create stat values
+	local wins = Instance.new("IntValue")
+	wins.Name = "Wins"
+	wins.Parent = leaderstats
+	
+	local cash = Instance.new("IntValue")
+	cash.Name = "Cash"
+	cash.Parent = leaderstats
+	
+	--Create value to track if the player is opening a crate nahui
+	local isOpening = Instance.new("BoolValue")
+	isOpening.Name = "IsOpening"
+	isOpening.Parent = player
+	
+	--Bats related data to save
+	local bats = Instance.new("Folder")
+	bats.Name = "Bats"
+	bats.Parent = player
+	
+	-- Track equipped bat
+	local equippedBat = Instance.new("StringValue")
+	equippedBat.Name = "EquippedBat"
+	equippedBat.Parent = player
+	
+	
+	
+	-- Load player data from DataStore
+	local data = DataStoreManager.LoadPlayerData(player)
+	
+	-- Apply loaded values
+	if data then
+		wins.Value = data.Wins or 0
+		cash.Value = data.Cash or 0
+		
+		-- Load Bats data
+		if data.Bats then
+			for batName, owned in pairs(data.Bats) do
+				local batValue = Instance.new("BoolValue")
+				batValue.Name = batName
+				batValue.Value = owned
+				batValue.Parent = bats
+			end
+		end
+		
+		-- Load EquippedBat data
+		if data.EquippedBat and data.EquippedBat ~= "" then
+			equippedBat.Value = data.EquippedBat
+		end
+		
+		print("Loaded data for " .. player.Name .. ": Cash=" .. cash.Value .. ", Wins=" .. wins.Value .. ", Bats=" .. (data.Bats and #data.Bats or 0))
+		
+		ReplicatedStorage.CustomiseRelatedRemotes.LoadInventory:Fire(player, bats, equippedBat.Value)
+	end
+end)
+
+-- Save data when player leaves
+Players.PlayerRemoving:Connect(function(player)
+	task.spawn(function()
+		DataStoreManager.SavePlayerData(player)
+		print("Saved data for " .. player.Name .. " on leave")
+	end)
+end)	
+
+
