@@ -94,11 +94,8 @@ function equipBat(button: TextButton, batBool: BoolValue, plr: Player)
 		equippedBatValue.Value = batBool.Name
 	end
 	
-	local batEffect = BatsFolder:FindFirstChild(batBool.Name, true)
-	if not batEffect then return end
-	
-	local clonedBat = batEffect:Clone()
-	clonedBat.Parent = character
+	-- No physical bat is parented to the character here.
+	-- BatSpawner will read this preference and create the merged bat during rounds.
 	
 end
 
