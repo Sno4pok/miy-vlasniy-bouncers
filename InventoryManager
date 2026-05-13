@@ -1,0 +1,199 @@
+--//Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--//Folders
+local Remotes = ReplicatedStorage.CustomiseRelatedRemotes
+local Configs = ReplicatedStorage.Configs
+local BatsFolder = ReplicatedStorage.Bats
+
+--//Modules
+local Bats = require(Configs.Bats)
+
+--//Tables
+local equippedBats = {}
+
+--//Constants
+local EQUIP_COLOR = Color3.fromRGB(91, 255, 32)
+local UNEQUIP_COLOR = Color3.fromRGB(255, 55, 55)
+
+--//Helper functions
+function getCharacter(plr: Player)
+	return plr.Character 
+end
+
+function destroyBat(character: Model, batName: string)
+	local batEffects = character:FindFirstChild(batName)
+	if batEffects then
+		batEffects:Destroy()
+	end
+end
+
+function updateButtonUI(button: TextButton, isEquipped: boolean)
+	button.Text = isEquipped and "Unequip" or "Equip"
+	button.BackgroundColor3 = isEquipped and UNEQUIP_COLOR or EQUIP_COLOR
+end
+
+function unequipCurrent(plr: Player)
+	local current = equippedBats[plr]
+	if not current then return end
+	
+	local character = getCharacter(plr)
+	if character then
+		destroyBat(character, current.bat.Name)
+	end
+	
+	current.bat.Value = false
+	updateButtonUI(current.button, false)
+	
+	-- Clear EquippedBat value
+	local equippedBatValue = plr:FindFirstChild("EquippedBat")
+	if equippedBatValue then
+		equippedBatValue.Value = ""
+	end
+	
+	equippedBats[plr] = nil
+end 
+
+function findBatData(batName: string)
+	for rarity, batsForRarity in pairs(Bats) do
+		local batsInfo = batsForRarity[batName]
+		if batsInfo then
+			return batsInfo, rarity
+		end
+	end
+end
+
+--//Main functions
+function equipBat(button: TextButton, batBool: BoolValue, plr: Player)
+	local current = equippedBats[plr]
+	
+	local character = getCharacter(plr)
+	if not character then return end
+	
+	if current and current.bat == batBool then
+		unequipCurrent(plr)
+		return
+	end
+	
+	--Unequiping previous bat
+	if current and current.button then
+		unequipCurrent(plr)
+	end
+	
+	--Equip new bat
+	updateButtonUI(button, true)
+	
+	equippedBats[plr] = {
+		bat = batBool,
+		button = button
+	}
+	
+	-- Update EquippedBat value
+	local equippedBatValue = plr:FindFirstChild("EquippedBat")
+	if equippedBatValue then
+		equippedBatValue.Value = batBool.Name
+	end
+	
+	local batEffect = BatsFolder:FindFirstChild(batBool.Name, true)
+	if not batEffect then return end
+	
+	local clonedBat = batEffect:Clone()
+	clonedBat.Parent = character
+	
+end
+
+function deleteBat(batClone: Frame, batBool: BoolValue, plr: Player)
+	local current = equippedBats[plr]
+
+	--Unequipping
+	if current and current.bat == batBool then
+		unequipCurrent(plr)
+	end
+
+	--Delete from inventory
+	batClone:Destroy()
+	batBool:Destroy()
+
+end
+
+--Inventory UI
+function clearInventory(frame: Frame)
+	for _, item in pairs(frame:GetChildren()) do
+		if item:IsA("UIGridLayout") or item.Name == "Template" then continue end
+		item:Destroy()
+	end
+end
+
+function setupItemUI(clone: Frame, bat: BoolValue, plr: Player)
+	local preview = clone:WaitForChild("Preview")
+	local gradient = preview:WaitForChild("UIGradient")
+	local header = clone:WaitForChild("Header")
+	local rarityText = clone:WaitForChild("Rarity")
+	local equipButton = clone:WaitForChild("Equip_Button")
+	local deleteButton = clone:WaitForChild("Delete_Button")
+
+	local batData, rarity = findBatData(bat.Name)
+	if not batData then return false end
+
+	rarityText.Text = rarity
+	header.Text = bat.Name
+	gradient.Color = batData.Colour
+
+	clone.LayoutOrder = batData.LayoutOrder
+	clone.Visible = true
+
+	equipButton.MouseButton1Click:Connect(function()
+		equipBat(equipButton, bat, plr)
+	end)
+
+	deleteButton.MouseButton1Click:Connect(function()
+		deleteBat(clone, bat, plr)
+	end)
+	
+	return true
+end
+
+--Load inventory
+ReplicatedStorage.CustomiseRelatedRemotes.LoadInventory.Event:Connect(function(plr: Player, bats: Folder, savedEquippedBat: string)
+	local playerGui = plr:WaitForChild("PlayerGui")
+	local inventoryGui = playerGui:WaitForChild("LeftSideGUIs")
+	local background = inventoryGui:WaitForChild("Inventory_Background")
+	local itemFrame = background:WaitForChild("ItemFrame")
+	local template = itemFrame:WaitForChild("Template")
+	
+	clearInventory(itemFrame)
+	
+	local equippedBatButton = nil
+	
+	for _, bat in ipairs(bats:GetChildren()) do
+		local clone = template:Clone()
+		clone.Parent = itemFrame
+		clone.Name = "ITEM"
+		
+		local success = setupItemUI(clone, bat, plr)
+		if not success then 
+			clone:Destroy()
+		end
+		
+		-- Track the button for the saved equipped bat
+		if savedEquippedBat and bat.Name == savedEquippedBat then
+			local equipButton = clone:FindFirstChild("Equip_Button")
+			if equipButton then
+				equippedBatButton = equipButton
+			end
+		end
+	end
+	
+	-- Re-equip the saved bat if one was equipped
+	if savedEquippedBat and savedEquippedBat ~= "" then
+		local batBool = bats:FindFirstChild(savedEquippedBat)
+		if batBool and batBool.Value and equippedBatButton then
+			-- Check if player has a character
+			local character = getCharacter(plr)
+			if character then
+				equipBat(equippedBatButton, batBool, plr)
+			end
+		end
+	end
+end)
+
