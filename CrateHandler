@@ -71,24 +71,52 @@ Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
 end
 
 Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
+	local crateType = cratesBeingOpened[plr.UserId]
 	local bat = getRandomBat(plr)
 	
 	local playerBats = plr:WaitForChild("Bats")
-	local batValue = Instance.new("BoolValue")
-	batValue.Value = true
-	batValue.Parent = playerBats
+	local leaderstats = plr:FindFirstChild("leaderstats")
+	
+	local isDuplicate = false
+	local batName = "Red" -- Default fallback
 	
 	if bat then
-		print("Player got:", bat)
-		batValue.Name = bat.Name
+		batName = bat.Name
+		local existingBat = playerBats:FindFirstChild(batName)
+		
+		if existingBat then
+			-- Duplicate! Give compensation instead of another BoolValue
+			isDuplicate = true
+			local batData = Bats[crateType] and Bats[crateType][batName]
+			if batData and batData.Compensation then
+				local crateInfo = Crates[crateType]
+				local currencyStat = leaderstats and leaderstats:FindFirstChild(crateInfo and crateInfo.Currency or "Cash")
+				if currencyStat then
+					currencyStat.Value += batData.Compensation
+					print("Duplicate bat!", batName, "- Compensation:", batData.Compensation)
+				end
+			end
+		else
+			-- New bat! Create BoolValue
+			local batValue = Instance.new("BoolValue")
+			batValue.Value = true
+			batValue.Name = batName
+			batValue.Parent = playerBats
+			print("Player got:", batName)
+		end
 	else
-		warn("Error getting bat, giving red instead")
-		batValue.Name = "Red"
+		-- Error getting bat - likely an exploit or developer error
+		warn("Failed to get bat for", plr.Name, "- possible exploit or missing asset")
+		-- Don't give anything for free
 	end
 	
 	local isOpening = plr:FindFirstChild("IsOpening")
 	isOpening.Value = false
 	cratesBeingOpened[plr.UserId] = nil
-	Remotes.LoadInventory:Fire(plr, playerBats)
+	
+	-- Pass the equipped bat so the UI maintains the correct state
+	local equippedBatValue = plr:FindFirstChild("EquippedBat")
+	local savedEquippedBat = equippedBatValue and equippedBatValue.Value or ""
+	Remotes.LoadInventory:Fire(plr, playerBats, savedEquippedBat)
 end)
 
