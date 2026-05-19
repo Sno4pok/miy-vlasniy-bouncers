@@ -42,7 +42,10 @@ function unequipCurrent(plr: Player)
 		destroyBat(character, current.bat.Name)
 	end
 	
-	current.bat.Value = false
+	-- NOTE: We do NOT set current.bat.Value = false here!
+	-- The BoolValue.Value indicates OWNERSHIP, not equipped state.
+	-- Setting it to false would make the player "lose" the bat.
+	
 	updateButtonUI(current.button, false)
 	
 	-- Clear EquippedBat value
@@ -67,9 +70,7 @@ end
 function equipBat(button: TextButton, batBool: BoolValue, plr: Player)
 	local current = equippedBats[plr]
 	
-	local character = getCharacter(plr)
-	if not character then return end
-	
+	-- Toggle off if clicking the same bat
 	if current and current.bat == batBool then
 		unequipCurrent(plr)
 		return
@@ -182,15 +183,37 @@ ReplicatedStorage.CustomiseRelatedRemotes.LoadInventory.Event:Connect(function(p
 	end
 	
 	-- Re-equip the saved bat if one was equipped
+	print("[DEBUG] savedEquippedBat:", savedEquippedBat)
+	print("[DEBUG] bats folder contents:")
+	for _, b in ipairs(bats:GetChildren()) do
+		print("  -", b.Name, "Value:", b.Value)
+	end
+	
 	if savedEquippedBat and savedEquippedBat ~= "" then
 		local batBool = bats:FindFirstChild(savedEquippedBat)
-		if batBool and batBool.Value and equippedBatButton then
-			-- Check if player has a character
-			local character = getCharacter(plr)
-			if character then
-				equipBat(equippedBatButton, batBool, plr)
-			end
+		print("[DEBUG] batBool found:", batBool ~= nil)
+		if batBool then
+			print("[DEBUG] batBool.Value:", batBool.Value)
 		end
+		print("[DEBUG] equippedBatButton found:", equippedBatButton ~= nil)
+		
+		-- Check if batBool exists (the player has this bat in their data)
+		-- Note: We don't check batBool.Value because it might be false due to a previous bug
+		-- that set Value to false when unequipping. The existence of the BoolValue means
+		-- the player owns this bat.
+		if batBool and equippedBatButton then
+			print("[DEBUG] Calling equipBat for", savedEquippedBat)
+			-- Clear stale reference before re-equipping.
+			-- The old button was destroyed by clearInventory(), so equippedBats[plr]
+			-- holds an invalid button reference. Without clearing this, equipBat would
+			-- see the same batBool and incorrectly "toggle off" instead of re-equipping.
+			equippedBats[plr] = nil
+			equipBat(equippedBatButton, batBool, plr)
+		else
+			warn("[DEBUG] equipBat NOT called - batBool:", batBool ~= nil, "equippedBatButton:", equippedBatButton ~= nil)
+		end
+	else
+		print("[DEBUG] No saved equipped bat to re-equip")
 	end
 end)
 
