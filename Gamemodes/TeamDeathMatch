@@ -1,0 +1,89 @@
+local TeamDeathMatch = {}
+
+TeamDeathMatch.Name = "Team Death Match"
+TeamDeathMatch.Description = "Last team standing wins!"
+TeamDeathMatch.Teams = {"Red", "Blue", "Lobby"}
+TeamDeathMatch.BatMode = "single" -- One player gets the bat at a time
+
+function TeamDeathMatch:SetupTeams(teams)
+	-- Create Red and Blue teams if they don't exist
+	local Teams = game:GetService("Teams")
+	
+	local redTeam = Teams:FindFirstChild("Red")
+	if not redTeam then
+		redTeam = Instance.new("Team")
+		redTeam.Name = "Red"
+		redTeam.TeamColor = BrickColor.new("Bright red")
+		redTeam.AutoAssignable = false
+		redTeam.Parent = Teams
+	end
+	
+	local blueTeam = Teams:FindFirstChild("Blue")
+	if not blueTeam then
+		blueTeam = Instance.new("Team")
+		blueTeam.Name = "Blue"
+		blueTeam.TeamColor = BrickColor.new("Bright blue")
+		blueTeam.AutoAssignable = false
+		blueTeam.Parent = Teams
+	end
+	
+	teams.Red = redTeam
+	teams.Blue = blueTeam
+end
+
+function TeamDeathMatch:GetPlayersInGame(players)
+	local playingPlayers = {}
+	for _, player in pairs(players) do
+		if player.Team and (player.Team.Name == "Red" or player.Team.Name == "Blue") then
+			table.insert(playingPlayers, player)
+		end
+	end
+	return playingPlayers
+end
+
+function TeamDeathMatch:GetTeamPlayers(players, teamName)
+	local teamPlayers = {}
+	for _, player in pairs(players) do
+		if player.Team and player.Team.Name == teamName then
+			table.insert(teamPlayers, player)
+		end
+	end
+	return teamPlayers
+end
+
+function TeamDeathMatch:CheckWinCondition(players)
+	local redPlayers = self:GetTeamPlayers(players, "Red")
+	local bluePlayers = self:GetTeamPlayers(players, "Blue")
+	
+	if #redPlayers == 0 and #bluePlayers == 0 then
+		return "none", "Everyone has died"
+	elseif #redPlayers == 0 then
+		return "team", "Blue team has won!"
+	elseif #bluePlayers == 0 then
+		return "team", "Red team has won!"
+	end
+	
+	return nil, nil
+end
+
+function TeamDeathMatch:OnPlayerDeath(player, teams)
+	-- Move dead player to Lobby team
+	player.Team = teams.Lobby
+end
+
+function TeamDeathMatch:AssignTeams(players)
+	-- Assign players to teams alternately
+	local Teams = game:GetService("Teams")
+	local redTeam = Teams:FindFirstChild("Red")
+	local blueTeam = Teams:FindFirstChild("Blue")
+	
+	for i, player in pairs(players) do
+		if i % 2 == 1 then
+			player.Team = redTeam
+		else
+			player.Team = blueTeam
+		end
+	end
+end
+
+return TeamDeathMatch
