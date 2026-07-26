@@ -1,0 +1,113 @@
+--Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+--Folders
+local Configs = ReplicatedStorage:WaitForChild("Configs")
+local CratesFolder = ReplicatedStorage:WaitForChild("Crates")
+local Remotes = ReplicatedStorage:WaitForChild("CustomiseRelatedRemotes")
+
+--Events
+local BuyCrate = Remotes:WaitForChild("BuyCrate")
+local FinishedOpening = Remotes:WaitForChild("FinishedOpening")
+
+--Modules
+local Crates = require(Configs:WaitForChild("Crates"))
+
+--GUIs
+local gui = script.Parent
+local crateGui = gui.Parent:WaitForChild("CrateGui")
+local background = gui:WaitForChild("Shop_Background")
+local inventory_background = gui:WaitForChild("Inventory_Background")
+local openBtn = gui.Frame:WaitForChild("Shop_Button")
+local closeBtn = background:WaitForChild("Close_Button")
+local itemFrame = background:WaitForChild("ItemFrame")
+local crateView = crateGui:WaitForChild("CrateView")
+
+--Templates
+local TEMPLATE = itemFrame:WaitForChild("Template")
+
+--Constants
+local DURATION = 2
+local SINGGLE_TWEEN_TIME = 0.2
+local ANGLE = 5
+
+function animate(direction: number, startTime: number)
+	if tick() - startTime >= DURATION then
+		crateView.Rotation = 0
+		return			
+	end
+	
+	local tween = TweenService:Create(
+		crateView,
+		TweenInfo.new(SINGGLE_TWEEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut ),
+		{Rotation = direction * ANGLE}
+	)
+	
+	tween:Play()
+	
+	tween.Completed:Connect(function()
+		animate(-direction, startTime)
+	end)
+		
+	
+end
+
+function openCrate(crate:Model)
+	local clonedCrate = crate:Clone()
+	clonedCrate.Parent = crateView
+	crateView.Visible = true
+	animate(1, tick())
+	wait(DURATION + SINGGLE_TWEEN_TIME)
+	crateView.Visible = false
+	clonedCrate:Destroy()
+	--Finished Opening and boom
+	FinishedOpening:FireServer()
+end
+
+function generateGui()
+	for crateType, crateInfo in pairs(Crates) do
+		local crateToClone = CratesFolder:FindFirstChild(crateType .. "Crate")
+		if not crateToClone then return end
+		
+		local templateCloned = TEMPLATE:Clone()
+		templateCloned.Parent = itemFrame
+		templateCloned.Name = crateType
+		templateCloned.LayoutOrder = crateInfo.LayoutOrder
+		
+		local crate = crateToClone:Clone()
+		crate.Parent = templateCloned
+		
+		templateCloned.Visible = true
+		
+		templateCloned:WaitForChild("Header").Text = crateType
+		
+		local buyButton = templateCloned:WaitForChild("PurchaseButton")
+		buyButton.Text = crateInfo.Currency .. ": " .. crateInfo.Amount
+		
+		buyButton.MouseButton1Click:Connect(function()
+			local crate = BuyCrate:InvokeServer(crateType)
+			if crate then
+				background.Visible = false
+				
+				openCrate(crate)
+				
+			else
+				buyButton.BackgroundColor3 = Color3.fromRGB(255, 41, 41)
+				task.wait(.5)
+				buyButton.BackgroundColor3 = Color3.fromRGB(85, 255, 0)
+			end
+		end)
+	end
+end
+
+generateGui()
+
+closeBtn.MouseButton1Click:Connect(function()
+	background.Visible = false
+end)
+
+openBtn.MouseButton1Click:Connect(function()
+	inventory_background.Visible = false
+	background.Visible = true
+end)
