@@ -1,0 +1,125 @@
+local Bats = {
+	Simple = {
+		Electro = {
+			Weight = 15,
+			TheRarity = "Common",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+			},
+			LayoutOrder = 4,
+			Compensation = 10,
+			Icon = "rbxassetid://133558356130779"
+		},
+		Loli = {
+			Weight = 20,
+			TheRarity = "Mythic",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 16, 176)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 16, 176))
+			},
+			LayoutOrder = 3,
+			Compensation = 20,
+			Icon = "rbxassetid://88441205566432"
+		},
+		RollerPin = {
+			Weight = 35,
+			TheRarity = "Rare",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(31, 128, 29)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(31, 128, 29))
+			},
+			LayoutOrder = 1,
+			Compensation = 20,
+			Icon = "rbxassetid://133540184716865"
+		},
+		StickBlender = {
+			Weight = 30,
+			TheRarity = "Epic",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(31, 128, 29)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(31, 128, 29))
+			},
+			LayoutOrder = 2,
+			Compensation = 20,
+			Icon = "rbxassetid://103408630009502"
+		}
+	},
+	Premium = {
+		Red = {
+			Weight = 25,
+			TheRarity = "Common",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+			},
+			LayoutOrder = 11,
+			Compensation = 10,
+			Icon = ""
+		},
+		Blue = {
+			Weight = 25,
+			TheRarity = "Common",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 16, 176)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 16, 176))
+			},
+			LayoutOrder = 12,
+			Compensation = 20,
+			Icon = ""
+		},
+		Green = {
+			Weight = 20,
+			TheRarity = "Common",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(31, 128, 29)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(31, 128, 29))
+			},
+			LayoutOrder = 13,
+			Compensation = 20,
+			Icon = ""
+		},
+		Yellow = {
+			Weight = 15,
+			TheRarity = "Common",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 0))
+			},
+			LayoutOrder = 14,
+			Compensation = 30,
+			Icon = ""
+		},
+		
+		Orange = {
+			Weight = 15,
+			TheRarity = "Common",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(213, 115, 61)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(213, 115, 61))
+			},
+			LayoutOrder = 15,
+			Compensation = 40,
+			Icon = ""
+		}
+	},
+	Legendary = {
+		Rainbow = {
+			Weight = 100,
+			TheRarity = "Rare",
+			Colour = ColorSequence.new{
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(0.23, Color3.fromRGB(255, 140, 0)),
+				ColorSequenceKeypoint.new(0.448, Color3.fromRGB(255, 238, 0)),
+				ColorSequenceKeypoint.new(0.658, Color3.fromRGB(77, 233, 76)),
+				ColorSequenceKeypoint.new(0.853, Color3.fromRGB(55, 131, 255)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(72, 21, 170))
+			},
+			LayoutOrder = 21,
+			Compensation = 100,
+			Icon = ""
+		}
+	}
+}
+
+return Bats
