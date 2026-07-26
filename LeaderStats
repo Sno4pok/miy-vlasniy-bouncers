@@ -63,6 +63,7 @@ Players.PlayerAdded:Connect(function(player)
 		
 		ReplicatedStorage.CustomiseRelatedRemotes.LoadInventory:Fire(player, bats, equippedBat.Value)
 	end
+	
 end)
 
 -- Save data when player leaves
@@ -71,6 +72,5 @@ Players.PlayerRemoving:Connect(function(player)
 		DataStoreManager.SavePlayerData(player)
 		print("Saved data for " .. player.Name .. " on leave")
 	end)
-end)	
-
+end)
 

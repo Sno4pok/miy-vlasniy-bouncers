@@ -7,6 +7,7 @@ local inRound = ReplicatedStorage:WaitForChild("InRound")
 local batEvent = ReplicatedStorage:WaitForChild("BatEvent")
 local gameModeValue = ReplicatedStorage:WaitForChild("GameMode")
 local bat = ServerStorage:WaitForChild("Bat")
+local BatsFolder = ReplicatedStorage:WaitForChild("Bats")
 
 local playingTeam = Teams.Playing
 local redTeam = nil
@@ -54,14 +55,14 @@ local function removeAllBats()
 			local backpack = holder:FindFirstChild("Backpack")
 			if backpack then
 				for _, item in backpack:GetChildren() do
-					if item.Name == "Bat" then
+					if item:GetAttribute("IsGameplayBat") then
 						item:Destroy()
 					end
 				end
 			end
 			local character = holder.Character
 			for _, item in character:GetChildren() do
-				if item:IsA("Tool") and item.Name == "Bat" then
+				if item:IsA("Tool") and item:GetAttribute("IsGameplayBat") then
 					item:Destroy()
 				end
 			end
@@ -73,10 +74,74 @@ end
 -- Function to give bat to a player
 local function giveBatToPlayer(player)
 	if not player.Character then return nil end
-	
-	local batClone = bat:Clone()
-	batClone.Parent = player.Character -- This equips it directly
-	
+
+	local equippedBatName = ""
+	local equippedBatValue = player:FindFirstChild("EquippedBat")
+	if equippedBatValue and equippedBatValue:IsA("StringValue") then
+		equippedBatName = equippedBatValue.Value
+	end
+
+	local batClone
+
+	if equippedBatName ~= "" then
+		-- Find the cosmetic bat skin the player chose
+		local skinBat = BatsFolder:FindFirstChild(equippedBatName, true)
+		if skinBat and skinBat:IsA("Tool") then
+			batClone = skinBat:Clone()
+
+			-- Copy gameplay scripts from ServerStorage.Bat
+			local slayScript = bat:FindFirstChild("Slay")
+			if slayScript then
+				slayScript:Clone().Parent = batClone
+			end
+
+			local holdingScript = bat:FindFirstChild("Holding")
+			if holdingScript then
+				holdingScript:Clone().Parent = batClone
+			end
+
+
+			-- Copy gameplay Handle children (sounds, trail, attachments) from ServerStorage.Bat
+			local skinHandle = batClone:FindFirstChild("Handle")
+			local gameplayHandle = bat:FindFirstChild("Handle")
+			if skinHandle and gameplayHandle then
+				for _, child in ipairs(gameplayHandle:GetChildren()) do
+					-- Skip Mesh and Weld to preserve the skin's visual appearance
+					if child.Name ~= "Mesh" and child.Name ~= "Weld" then
+						if not skinHandle:FindFirstChild(child.Name) then
+							local clonedChild = child:Clone()
+							clonedChild.Parent = skinHandle
+
+							-- Fix Trail attachment references after cloning
+							if clonedChild:IsA("Trail") then
+								local att0Name = child.Attachment0 and child.Attachment0.Name or nil
+								local att1Name = child.Attachment1 and child.Attachment1.Name or nil
+								if att0Name then
+									clonedChild.Attachment0 = skinHandle:FindFirstChild(att0Name)
+								end
+								if att1Name then
+									clonedChild.Attachment1 = skinHandle:FindFirstChild(att1Name)
+								end
+							end
+						end
+					end
+				end
+			end
+
+			-- Mark as gameplay bat for removal tracking
+			batClone:SetAttribute("IsGameplayBat", true)
+		else
+			-- Skin not found, fall back to default bat
+			batClone = bat:Clone()
+			batClone:SetAttribute("IsGameplayBat", true)
+		end
+	else
+		-- No skin chosen, give default bat
+		batClone = bat:Clone()
+		batClone:SetAttribute("IsGameplayBat", true)
+	end
+
+	batClone.Parent = player.Character
 	return player
 end
 
