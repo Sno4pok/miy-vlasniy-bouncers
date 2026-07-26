@@ -1,0 +1,19 @@
+local Crates = {
+	Simple = {
+		Currency = "Cash",
+		Amount = 50,
+		LayoutOrder = 1
+	},
+	Premium = {
+		Currency = "Cash",
+		Amount = 100,
+		LayoutOrder = 2
+	},
+	Legendary = {
+		Currency = "Cash",
+		Amount = 200,
+		LayoutOrder = 3
+	}	
+}
+
+return Crates
