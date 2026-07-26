@@ -1,0 +1,40 @@
+local ClassicMode = {}
+
+ClassicMode.Name = "Classic"
+ClassicMode.Description = "Last player standing wins!"
+ClassicMode.Teams = {"Playing", "Lobby"}
+ClassicMode.BatMode = "single" -- One player gets the bat at a time
+
+function ClassicMode:SetupTeams(teams)
+	-- Classic mode uses existing Playing and Lobby teams
+	-- No additional setup needed
+end
+
+function ClassicMode:GetPlayersInGame(players)
+	local playingPlayers = {}
+	for _, player in pairs(players) do
+		if player.Team and player.Team.Name == "Playing" then
+			table.insert(playingPlayers, player)
+		end
+	end
+	return playingPlayers
+end
+
+function ClassicMode:CheckWinCondition(players)
+	local playingPlayers = self:GetPlayersInGame(players)
+	
+	if #playingPlayers == 0 then
+		return "none", "Everyone has died"
+	elseif #playingPlayers == 1 then
+		return "winner", playingPlayers[1].Name .. " has won!"
+	end
+	
+	return nil, nil
+end
+
+function ClassicMode:OnPlayerDeath(player, teams)
+	-- Move dead player to Lobby team
+	player.Team = teams.Lobby
+end
+
+return ClassicMode
