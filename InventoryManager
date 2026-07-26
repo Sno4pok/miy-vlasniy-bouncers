@@ -125,6 +125,7 @@ end
 function setupItemUI(clone: Frame, bat: BoolValue, plr: Player)
 	local preview = clone:WaitForChild("Preview")
 	local gradient = preview:WaitForChild("UIGradient")
+	local iconLabel = preview:FindFirstChild("IconLabel")
 	local header = clone:WaitForChild("Header")
 	local rarityText = clone:WaitForChild("Rarity")
 	local equipButton = clone:WaitForChild("Equip_Button")
@@ -135,7 +136,21 @@ function setupItemUI(clone: Frame, bat: BoolValue, plr: Player)
 
 	rarityText.Text = rarity
 	header.Text = bat.Name
-	gradient.Color = batData.Colour
+
+	-- Icon vs gradient fallback
+	if batData.Icon and batData.Icon ~= "" then
+		if iconLabel then
+			iconLabel.Image = batData.Icon
+			iconLabel.Visible = true
+		end
+		gradient.Transparency = NumberSequence.new(1)
+	else
+		if iconLabel then
+			iconLabel.Visible = false
+		end
+		gradient.Transparency = NumberSequence.new(0)
+		gradient.Color = batData.Colour
+	end
 
 	clone.LayoutOrder = batData.LayoutOrder
 	clone.Visible = true
