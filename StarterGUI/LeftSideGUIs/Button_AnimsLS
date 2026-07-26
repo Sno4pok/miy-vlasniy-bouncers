@@ -1,0 +1,60 @@
+local TweenService = game:GetService("TweenService")
+
+local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local clickSound = script:WaitForChild("UIClickSound")
+local hoverSound = script:WaitForChild("UIHoverSound")
+
+local leftUI = script.Parent.Frame
+
+local hoverTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local unHoverTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+
+local Table = {}
+
+function SetUpSounds()
+	for _, ui in ipairs(playerGui:GetDescendants()) do
+		LinkButtonSound(ui)
+	end
+	
+	playerGui.DescendantAdded:Connect(function(ui)
+		LinkButtonSound(ui)
+	end)
+	
+end
+
+function LinkButtonSound(button)
+	if button:IsA("TextButton") or button:IsA("ImageButton") then	
+		button.MouseButton1Click:Connect(function()
+			clickSound:Play()
+		end)
+		button.MouseEnter:Connect(function()
+			hoverSound:Play()
+		end)
+	end
+end
+
+function SetUpButtonAnims()
+	for _, button in ipairs(leftUI:GetChildren()) do
+		if button:IsA("TextButton") or button:IsA("ImageButton") then
+			local inProps = {Size = button.Size + UDim2.new(0.16, 0, 0.05, 0)}
+			local outProps = {Size = button.Size}
+			
+			Table[button.Name .. "Hover"] = TweenService:Create(button, hoverTweenInfo, inProps)
+			Table[button.Name .. "UnHover"] = TweenService:Create(button, unHoverTweenInfo, outProps)
+			
+			button.MouseEnter:Connect(function()
+				Table[button.Name .. "Hover"]:Play()
+			end)
+			button.MouseLeave:Connect(function()
+				Table[button.Name .. "UnHover"]:Play()
+			end)
+			button.MouseButton1Click:Connect(function()
+				Table[button.Name .. "UnHover"]:Play()
+			end)
+		end
+	end
+end
+
+SetUpSounds()
+SetUpButtonAnims()
