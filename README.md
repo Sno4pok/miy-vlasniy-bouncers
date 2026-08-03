@@ -23,11 +23,11 @@ This repository serves as:
 
 # 🚀 Key Modules & Mechanics
 
-1. RoundSys
+1. RoundSys.
 Game loop manager handling round timers, spawning, votings etc.
-2. MS DataStoreManager
+2. MS DataStoreManager.
 Safe player data saving and loading system with error handling.
-3. LeaderStats
+3. LeaderStats.
 Creates and manages player leaderboard stats on join.
 
 notes:
