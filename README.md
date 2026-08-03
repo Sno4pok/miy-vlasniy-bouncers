@@ -25,16 +25,16 @@ This repository serves as:
 
 1. RoundSys
 Game loop manager handling round timers, spawning, votings etc.
-
 2.MS DataStoreManager
 Safe player data saving and loading system with error handling.
-
 3.LeaderStats
 Creates and manages player leaderboard stats on join.
 
 notes:
 The "MS" prefix indicates that it is a ModuleScript.
+
 The "LS" prefix indicates that it is a LocalScript; additionally, all scripts in StarterGUI are local.
+
 If there is no prefix, it is a standard script.
 
 ---
@@ -49,9 +49,10 @@ Version Control: GitHub
 ---
 
 📝 Helpful Resources & Documentation
-Roblox Creator Documentation
 
-Roblox Engine API Reference
+[Roblox Creator Documentation](https://create.roblox.com/docs)
+
+[Roblox Engine API Reference](https://create.roblox.com/docs/reference/engine)
 
 Maintained for personal development and Roblox game engineering.
 
