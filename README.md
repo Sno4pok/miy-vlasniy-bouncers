@@ -31,11 +31,9 @@ Safe player data saving and loading system with error handling.
 Creates and manages player leaderboard stats on join.
 
 notes:
-The "MS" prefix indicates that it is a ModuleScript.
-
-The "LS" prefix indicates that it is a LocalScript; additionally, all scripts in StarterGUI are local.
-
-If there is no prefix, it is a standard script.
+  The "MS" prefix indicates that it is a ModuleScript.
+  The "LS" prefix indicates that it is a LocalScript; additionally, all scripts in StarterGUI are local.
+  If there is no prefix, it is a standard script.
 
 ---
 
@@ -60,8 +58,8 @@ Maintained for personal development and Roblox game engineering.
 
 # General Notes
 
-I write code directly in Roblox Studio and manually upload the scripts to GitHub.
-This project is NOT built using **VS Code** synced with **Roblox Studio** via **Rojo**.
-I am uploading only the script part here.
+  I write code directly in Roblox Studio and manually upload the scripts to GitHub.
+  This project is NOT built using **VS Code** synced with **Roblox Studio** via **Rojo**.
+  I am uploading only the script part here.
 
 ---
