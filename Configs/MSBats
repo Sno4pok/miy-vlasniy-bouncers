@@ -1,4 +1,12 @@
 local Bats = {
+	-- Rarity tiers and their display colors (ColorSequence placeholders - edit these)
+	Rarities = {
+		Common = ColorSequence.new(Color3.fromRGB(160, 160, 160)),
+		Rare = ColorSequence.new(Color3.fromRGB(80, 150, 255)),
+		Epic = ColorSequence.new(Color3.fromRGB(180, 90, 255)),
+		Mythic = ColorSequence.new(Color3.fromRGB(255, 200, 60)),
+		Legendary = ColorSequence.new(Color3.fromRGB(255, 215, 0)),
+	},
 	Simple = {
 		Electro = {
 			Weight = 15,
@@ -70,7 +78,7 @@ local Bats = {
 		},
 		Green = {
 			Weight = 20,
-			TheRarity = "Common",
+			TheRarity = "Legendary",
 			Colour = ColorSequence.new{
 				ColorSequenceKeypoint.new(0, Color3.fromRGB(31, 128, 29)),
 				ColorSequenceKeypoint.new(1, Color3.fromRGB(31, 128, 29))
