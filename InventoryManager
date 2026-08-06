@@ -134,7 +134,14 @@ function setupItemUI(clone: Frame, bat: BoolValue, plr: Player)
 	local batData, rarity = findBatData(bat.Name)
 	if not batData then return false end
 
-	rarityText.Text = rarity
+	rarityText.Text = batData.TheRarity or rarity
+
+	-- Apply the rarity color from Configs.Bats.Rarities (ColorSequence -> first keypoint)
+	local rarityColor = Bats.Rarities and Bats.Rarities[batData.TheRarity]
+	if rarityColor then
+		rarityText.TextColor3 = rarityColor.Keypoints[1].Value
+	end
+
 	header.Text = bat.Name
 
 	-- Icon vs gradient fallback
