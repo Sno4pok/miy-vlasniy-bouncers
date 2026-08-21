@@ -13,6 +13,7 @@ local FinishedOpening = Remotes:WaitForChild("FinishedOpening")
 
 --Modules
 local Crates = require(Configs:WaitForChild("Crates"))
+local Bats = require(Configs:WaitForChild("Bats"))
 
 --GUIs
 local gui = script.Parent
@@ -22,53 +23,217 @@ local inventory_background = gui:WaitForChild("Inventory_Background")
 local openBtn = gui.Frame:WaitForChild("Shop_Button")
 local closeBtn = background:WaitForChild("Close_Button")
 local itemFrame = background:WaitForChild("ItemFrame")
-local crateView = crateGui:WaitForChild("CrateView")
+
+-- CrateGui references
+local crateBackground = crateGui:WaitForChild("Background")
+local openingFrame = crateBackground:WaitForChild("OpeningFrame")
+local title = openingFrame:WaitForChild("Title")
+local stripContainer = openingFrame:WaitForChild("StripContainer")
+local scrollingStrip = stripContainer:WaitForChild("ScrollingStrip")
+local stripLayout = scrollingStrip:WaitForChild("UIListLayout")
+local itemTemplate = scrollingStrip:WaitForChild("ItemTemplate")
+local resultFrame = openingFrame:WaitForChild("ResultFrame")
+local resultIcon = resultFrame:WaitForChild("ResultIcon")
+local resultName = resultFrame:WaitForChild("ResultName")
+local resultRarity = resultFrame:WaitForChild("ResultRarity")
+local resultStatus = resultFrame:WaitForChild("ResultStatus")
+local continueButton = openingFrame:WaitForChild("ContinueButton")
 
 --Templates
 local TEMPLATE = itemFrame:WaitForChild("Template")
 
 --Constants
-local DURATION = 2
-local SINGGLE_TWEEN_TIME = 0.2
-local ANGLE = 5
+local ITEM_COUNT = 60
+local STOP_INDEX = 45  -- 0-indexed position of the winning item
+local ITEM_SIZE = 100
+local ITEM_PADDING = 8
+local SCROLL_DURATION = 5
+local RARITY_COLORS = {
+	Common = Color3.fromRGB(160, 160, 160),
+	Rare = Color3.fromRGB(80, 150, 255),
+	Epic = Color3.fromRGB(180, 90, 255),
+	Mythic = Color3.fromRGB(255, 200, 60),
+	Legendary = Color3.fromRGB(255, 215, 0),
+}
 
-function animate(direction: number, startTime: number)
-	if tick() - startTime >= DURATION then
-		crateView.Rotation = 0
-		return			
+-- Get all bat entries for a crate type
+local function getBatPool(crateType)
+	local pool = Bats[crateType]
+	if not pool then return {} end
+	local entries = {}
+	for name, data in pairs(pool) do
+		table.insert(entries, {
+			name = name,
+			icon = data.Icon or "",
+			rarity = data.TheRarity or "Common",
+			weight = data.Weight or 1,
+		})
+	end
+	return entries
+end
+
+-- Pick a random bat from the pool (weighted)
+local function pickRandomBat(pool)
+	local totalWeight = 0
+	for _, entry in ipairs(pool) do
+		totalWeight += entry.weight
+	end
+	local roll = math.random(1, totalWeight)
+	local current = 0
+	for _, entry in ipairs(pool) do
+		current += entry.weight
+		if roll <= current then
+			return entry
+		end
+	end
+	return pool[1]
+end
+
+local function clearStrip()
+	for _, child in ipairs(scrollingStrip:GetChildren()) do
+		if child ~= itemTemplate and child ~= stripLayout then
+			child:Destroy()
+		end
+	end
+end
+
+local function openCrate(crateType, rewardInfo)
+	-- Build the scrolling strip
+	clearStrip()
+	
+	local pool = getBatPool(crateType)
+	if #pool == 0 then
+		FinishedOpening:FireServer()
+		return
 	end
 	
+	-- Build items: random items with the winner at STOP_INDEX (0-indexed)
+	local items = {}
+	for i = 1, ITEM_COUNT do
+		if i == STOP_INDEX + 1 then
+			-- Place the winning item
+			table.insert(items, {
+				name = rewardInfo.batName,
+				icon = rewardInfo.icon,
+				rarity = rewardInfo.rarity,
+			})
+		else
+			-- Place a random item
+			local randomBat = pickRandomBat(pool)
+			table.insert(items, randomBat)
+		end
+	end
+	
+	-- Create the item frames
+	for i, itemData in ipairs(items) do
+		local item = itemTemplate:Clone()
+		item.Name = "Item" .. i
+		item.Visible = true
+		item.LayoutOrder = i
+		
+		local icon = item:FindFirstChild("Icon")
+		if icon then
+			icon.Image = itemData.icon
+		end
+		
+		local stroke = item:FindFirstChild("RarityStroke")
+		if stroke then
+			local color = RARITY_COLORS[itemData.rarity] or RARITY_COLORS.Common
+			stroke.Color = color
+		end
+		
+		item.Parent = scrollingStrip
+	end
+	
+	-- Set the scrolling strip width to fit all items
+	local itemWidth = ITEM_SIZE + ITEM_PADDING
+	local totalStripWidth = ITEM_COUNT * itemWidth
+	scrollingStrip.Size = UDim2.new(0, totalStripWidth, 1, 0)
+	
+	-- Show the UI
+	crateBackground.Visible = true
+	openingFrame.Visible = true
+	resultFrame.Visible = false
+	continueButton.Visible = false
+	title.Text = "Opening Crate..."
+	
+	-- Start the strip at the left edge
+	scrollingStrip.Position = UDim2.new(0, 0, 0, 0)
+	
+	-- Wait a frame for layout to update
+	task.wait(0.1)
+	
+	-- Calculate target position so the winning item is centered
+	local containerWidth = stripContainer.AbsoluteSize.X
+	local winnerCenter = STOP_INDEX * itemWidth + ITEM_SIZE / 2
+	local targetX = containerWidth / 2 - winnerCenter
+	
+	-- Tween the strip position with Quart Out easing
 	local tween = TweenService:Create(
-		crateView,
-		TweenInfo.new(SINGGLE_TWEEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut ),
-		{Rotation = direction * ANGLE}
+		scrollingStrip,
+		TweenInfo.new(SCROLL_DURATION, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+		{Position = UDim2.new(0, targetX, 0, 0)}
 	)
 	
 	tween:Play()
+	tween.Completed:Wait()
 	
-	tween.Completed:Connect(function()
-		animate(-direction, startTime)
+	-- Show result
+	title.Text = "You Got:"
+	resultFrame.Visible = true
+	resultIcon.Image = rewardInfo.icon
+	resultName.Text = rewardInfo.batName
+	resultRarity.Text = rewardInfo.rarity
+	
+	local rarityColor = RARITY_COLORS[rewardInfo.rarity] or RARITY_COLORS.Common
+	resultRarity.TextColor3 = rarityColor
+	
+	if rewardInfo.isDuplicate then
+		resultStatus.Text = "DUPLICATE  (+" .. rewardInfo.compensation .. " Cash)"
+		resultStatus.TextColor3 = Color3.fromRGB(255, 170, 0)
+	else
+		resultStatus.Text = "NEW!"
+		resultStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
+	end
+	
+	continueButton.Visible = true
+	
+	-- Wait for player to click continue (or auto-continue after 10 seconds)
+	local continuePressed = false
+	local connection
+	connection = continueButton.MouseButton1Click:Connect(function()
+		continuePressed = true
+		if connection then
+			connection:Disconnect()
+		end
 	end)
-		
 	
-end
-
-function openCrate(crate:Model)
-	local clonedCrate = crate:Clone()
-	clonedCrate.Parent = crateView
-	crateView.Visible = true
-	animate(1, tick())
-	wait(DURATION + SINGGLE_TWEEN_TIME)
-	crateView.Visible = false
-	clonedCrate:Destroy()
-	--Finished Opening and boom
+	local elapsed = 0
+	while not continuePressed and elapsed < 10 do
+		task.wait(0.1)
+		elapsed += 0.1
+	end
+	if connection and connection.Connected then
+		connection:Disconnect()
+	end
+	
+	-- Hide UI
+	crateBackground.Visible = false
+	openingFrame.Visible = false
+	resultFrame.Visible = false
+	continueButton.Visible = false
+	
+	-- Clear strip items
+	clearStrip()
+	
+	-- Tell server we're done
 	FinishedOpening:FireServer()
 end
 
 function generateGui()
 	for crateType, crateInfo in pairs(Crates) do
 		local crateToClone = CratesFolder:FindFirstChild(crateType .. "Crate")
-		if not crateToClone then return end
+		if not crateToClone then continue end
 		
 		local templateCloned = TEMPLATE:Clone()
 		templateCloned.Parent = itemFrame
@@ -86,12 +251,10 @@ function generateGui()
 		buyButton.Text = crateInfo.Currency .. ": " .. crateInfo.Amount
 		
 		buyButton.MouseButton1Click:Connect(function()
-			local crate = BuyCrate:InvokeServer(crateType)
-			if crate then
+			local crateModel, rewardInfo = BuyCrate:InvokeServer(crateType)
+			if crateModel and rewardInfo then
 				background.Visible = false
-				
-				openCrate(crate)
-				
+				openCrate(crateType, rewardInfo)
 			else
 				buyButton.BackgroundColor3 = Color3.fromRGB(255, 41, 41)
 				task.wait(.5)
