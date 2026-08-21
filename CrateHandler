@@ -12,14 +12,11 @@ local Crates = require(Configs.Crates)
 local Bats = require(Configs.Bats)
 
 --Tables
-local cratesBeingOpened = {}
+local cratesBeingOpened = {} -- [userId] = {crateType = ..., batName = ..., isDuplicate = ..., compensation = ...}
 
-function getRandomBat(plr:Player)
-	local crateType = cratesBeingOpened[plr.UserId]
-	if not crateType then return end
-	
+function rollRandomBat(crateType:string)
 	local pool = Bats[crateType]
-	if not pool then return end
+	if not pool then return nil, nil end
 	
 	local totalWeight = 0
 	for _, data in pairs(pool) do
@@ -31,15 +28,11 @@ function getRandomBat(plr:Player)
 	for name, data in pairs(pool) do
 		current += data.Weight
 		if roll <= current then
-			local batsTypeFolder = BatsFolder:FindFirstChild(crateType)
-			if not batsTypeFolder then return end
-			
-			local batObject = batsTypeFolder:FindFirstChild(name)
-			return batObject
+			return name, data
 		end
 	end
+	return nil, nil
 end
-
 
 Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
 	--Checking if is opening
@@ -59,55 +52,72 @@ Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
 	local crateToClone = CratesFolder:FindFirstChild(crateType .. "Crate")
 	if not crateToClone then return end
 	
+	-- Roll the reward NOW so the client can build the animation around it
+	local batName, batData = rollRandomBat(crateType)
+	if not batName or not batData then return end
+	
+	-- Check if duplicate
+	local playerBats = plr:FindFirstChild("Bats")
+	local isDuplicate = false
+	if playerBats and playerBats:FindFirstChild(batName) then
+		isDuplicate = true
+	end
+	
 	--Deducting
 	currencyStat.Value -= crateInfo.Amount
 	
 	--Opening
 	isOpening.Value = true
 	
-	cratesBeingOpened[plr.UserId] = crateType
+	-- Store the result for FinishedOpening to process
+	cratesBeingOpened[plr.UserId] = {
+		crateType = crateType,
+		batName = batName,
+		isDuplicate = isDuplicate,
+		compensation = batData.Compensation or 0,
+	}
 	
-	return crateToClone
+	-- Return crate model + reward info so client can build the animation
+	return crateToClone, {
+		batName = batName,
+		rarity = batData.TheRarity or "Common",
+		icon = batData.Icon or "",
+		isDuplicate = isDuplicate,
+		compensation = batData.Compensation or 0,
+	}
 end
 
 Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
-	local crateType = cratesBeingOpened[plr.UserId]
-	local bat = getRandomBat(plr)
+	local data = cratesBeingOpened[plr.UserId]
+	if not data then return end
 	
-	local playerBats = plr:WaitForChild("Bats")
+	local crateType = data.crateType
+	local batName = data.batName
+	local isDuplicate = data.isDuplicate
+	
+	local playerBats = plr:FindFirstChild("Bats")
 	local leaderstats = plr:FindFirstChild("leaderstats")
 	
-	local isDuplicate = false
-	local batName = "Red" -- Default fallback
-	
-	if bat then
-		batName = bat.Name
-		local existingBat = playerBats:FindFirstChild(batName)
-		
-		if existingBat then
-			-- Duplicate! Give compensation instead of another BoolValue
-			isDuplicate = true
-			local batData = Bats[crateType] and Bats[crateType][batName]
-			if batData and batData.Compensation then
-				local crateInfo = Crates[crateType]
-				local currencyStat = leaderstats and leaderstats:FindFirstChild(crateInfo and crateInfo.Currency or "Cash")
-				if currencyStat then
-					currencyStat.Value += batData.Compensation
-					print("Duplicate bat!", batName, "- Compensation:", batData.Compensation)
-				end
+	if isDuplicate then
+		-- Duplicate! Give compensation
+		local batData = Bats[crateType] and Bats[crateType][batName]
+		if batData and batData.Compensation then
+			local crateInfo = Crates[crateType]
+			local currencyStat = leaderstats and leaderstats:FindFirstChild(crateInfo and crateInfo.Currency or "Cash")
+			if currencyStat then
+				currencyStat.Value += batData.Compensation
+				print("Duplicate bat!", batName, "- Compensation:", batData.Compensation)
 			end
-		else
-			-- New bat! Create BoolValue
+		end
+	else
+		-- New bat! Create BoolValue
+		if playerBats and not playerBats:FindFirstChild(batName) then
 			local batValue = Instance.new("BoolValue")
 			batValue.Value = true
 			batValue.Name = batName
 			batValue.Parent = playerBats
 			print("Player got:", batName)
 		end
-	else
-		-- Error getting bat - likely an exploit or developer error
-		warn("Failed to get bat for", plr.Name, "- possible exploit or missing asset")
-		-- Don't give anything for free
 	end
 	
 	local isOpening = plr:FindFirstChild("IsOpening")
@@ -117,6 +127,8 @@ Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
 	-- Pass the equipped bat so the UI maintains the correct state
 	local equippedBatValue = plr:FindFirstChild("EquippedBat")
 	local savedEquippedBat = equippedBatValue and equippedBatValue.Value or ""
-	Remotes.LoadInventory:Fire(plr, playerBats, savedEquippedBat)
+	if playerBats then
+		Remotes.LoadInventory:Fire(plr, playerBats, savedEquippedBat)
+	end
 end)
 
