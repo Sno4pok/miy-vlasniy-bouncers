@@ -1,0 +1,119 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local voteEvent = ReplicatedStorage:WaitForChild("VoteEvent")
+local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+local votingGui = playerGui:WaitForChild("VotingGui")
+local votingFrame = votingGui:WaitForChild("VotingFrame")
+local buttonsContainer = votingFrame:WaitForChild("ButtonsContainer")
+local timerLabel = votingFrame:WaitForChild("TimerLabel")
+
+local hasVoted = false
+local selectedMode = nil
+local currentVotingModes = {} -- Will be set by server
+
+-- Function to create vote button
+local function createVoteButton(modeName, voteCount)
+	local button = Instance.new("TextButton")
+	button.Name = modeName .. "Button"
+	button.Size = UDim2.new(1, 0, 0.32, 0)
+	button.BackgroundColor3 = Color3.new(0.333, 0.667, 1)
+	button.TextColor3 = Color3.new(0, 0, 0)
+	button.TextScaled = true
+	button.TextSize = 14
+	button.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+	button.Text = modeName .. " - Votes: " .. voteCount
+	button.BorderSizePixel = 0
+	button.Parent = buttonsContainer
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.2, 0)
+	corner.Parent = button
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.new(0, 0, 0)
+	stroke.Thickness = 1
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = button
+	
+	local textSizeConstraint = Instance.new("UITextSizeConstraint")
+	textSizeConstraint.MaxTextSize = 22
+	textSizeConstraint.Parent = button
+	
+	-- Handle button click
+	button.MouseButton1Click:Connect(function()
+		if not hasVoted then
+			hasVoted = true
+			selectedMode = modeName
+			voteEvent:FireServer("vote", modeName)
+			
+			-- Highlight selected button
+			button.BackgroundColor3 = Color3.new(0.333, 1, 0)
+			
+			-- Disable all buttons
+			for _, child in pairs(buttonsContainer:GetChildren()) do
+				if child:IsA("TextButton") then
+					child.Text = child.Name:gsub("Button$", "") .. " - Voted!"
+			end
+		end
+		end
+	end)
+	
+	return button
+end
+
+-- Clear existing buttons
+local function clearButtons()
+	for _, child in pairs(buttonsContainer:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+end
+
+-- Handle events from server
+voteEvent.OnClientEvent:Connect(function(action, data)
+	if action == "startVoting" then
+		-- Show voting GUI
+		votingFrame.Visible = true
+		hasVoted = false
+		selectedMode = nil
+		clearButtons()
+		
+		-- Store the modes sent from server
+		currentVotingModes = data or {}
+		
+		-- Create buttons for each game mode sent from server
+		for _, modeName in pairs(currentVotingModes) do
+			createVoteButton(modeName, 0)
+		end
+		
+	elseif action == "updateVotes" then
+		-- Update vote counts on buttons
+		local voteCounts = data
+		for _, child in pairs(buttonsContainer:GetChildren()) do
+			if child:IsA("TextButton") then
+				local modeName = child.Name:gsub("Button$", "")
+				local votes = voteCounts[modeName] or 0
+				if hasVoted and selectedMode == modeName then
+					child.Text = modeName .. " - Voted! (" .. votes .. ")"
+				else
+					child.Text = modeName .. " - Votes: " .. votes
+				end
+			end
+		end
+		
+	elseif action == "updateTimer" then
+		-- Update timer display
+		timerLabel.Text = "Time left: " .. data
+		
+	elseif action == "votingEnd" then
+		-- Hide voting GUI and show result
+		local winningMode = data
+		timerLabel.Text = "Winner: " .. winningMode
+		task.wait(2)
+		votingFrame.Visible = false
+		clearButtons()
+	end
+end)
