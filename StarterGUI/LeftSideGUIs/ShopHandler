@@ -45,8 +45,7 @@ local TEMPLATE = itemFrame:WaitForChild("Template")
 --Constants
 local ITEM_COUNT = 60
 local STOP_INDEX = 45  -- 0-indexed position of the winning item
-local ITEM_SIZE = 100
-local ITEM_PADDING = 8
+local ITEM_PADDING_RATIO = 0.08 -- 8% of item size as padding
 local SCROLL_DURATION = 5
 local RARITY_COLORS = {
 	Common = Color3.fromRGB(160, 160, 160),
@@ -98,6 +97,22 @@ local function clearStrip()
 end
 
 local function openCrate(crateType, rewardInfo)
+	-- Show the UI first so we can measure the container
+	crateBackground.Visible = true
+	openingFrame.Visible = true
+	resultFrame.Visible = false
+	continueButton.Visible = false
+	title.Text = "Opening Crate..."
+	
+	-- Wait a frame for layout to update
+	task.wait(0.1)
+	
+	-- Calculate dynamic item size based on container height
+	local containerHeight = stripContainer.AbsoluteSize.Y
+	local itemSize = math.max(20, containerHeight)
+	local itemPadding = math.max(2, math.floor(itemSize * ITEM_PADDING_RATIO))
+	stripLayout.Padding = UDim.new(0, itemPadding)
+	
 	-- Build the scrolling strip
 	clearStrip()
 	
@@ -145,17 +160,10 @@ local function openCrate(crateType, rewardInfo)
 		item.Parent = scrollingStrip
 	end
 	
-	-- Set the scrolling strip width to fit all items
-	local itemWidth = ITEM_SIZE + ITEM_PADDING
+	-- Set the scrolling strip width to fit all items (initial estimate)
+	local itemWidth = itemSize + itemPadding
 	local totalStripWidth = ITEM_COUNT * itemWidth
 	scrollingStrip.Size = UDim2.new(0, totalStripWidth, 1, 0)
-	
-	-- Show the UI
-	crateBackground.Visible = true
-	openingFrame.Visible = true
-	resultFrame.Visible = false
-	continueButton.Visible = false
-	title.Text = "Opening Crate..."
 	
 	-- Start the strip at the left edge
 	scrollingStrip.Position = UDim2.new(0, 0, 0, 0)
@@ -163,9 +171,27 @@ local function openCrate(crateType, rewardInfo)
 	-- Wait a frame for layout to update
 	task.wait(0.1)
 	
-	-- Calculate target position so the winning item is centered
+	-- Read the ACTUAL rendered item width from the first cloned item.
+	-- The UIAspectRatioConstraint (AspectRatio=1, DominantAxis=Height, FitWithinMaxSize)
+	-- may clamp the width below our itemSize estimate, so we must measure the real width.
+	local firstItem = scrollingStrip:FindFirstChild("Item1")
+	local actualItemWidth = itemSize
+	if firstItem then
+		actualItemWidth = firstItem.AbsoluteSize.X
+		if actualItemWidth <= 0 then
+			actualItemWidth = itemSize
+		end
+	end
+	
+	-- Recalculate strip width and target position using the actual item width
+	local actualItemStep = actualItemWidth + itemPadding
+	local actualTotalWidth = ITEM_COUNT * actualItemStep
+	scrollingStrip.Size = UDim2.new(0, actualTotalWidth, 1, 0)
+	
+	task.wait(0.1)
+	
 	local containerWidth = stripContainer.AbsoluteSize.X
-	local winnerCenter = STOP_INDEX * itemWidth + ITEM_SIZE / 2
+	local winnerCenter = STOP_INDEX * actualItemStep + actualItemWidth / 2
 	local targetX = containerWidth / 2 - winnerCenter
 	
 	-- Tween the strip position with Quart Out easing
