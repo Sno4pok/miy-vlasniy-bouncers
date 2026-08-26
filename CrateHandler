@@ -87,7 +87,7 @@ Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
 	}
 end
 
-Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
+local function processReward(plr:Player)
 	local data = cratesBeingOpened[plr.UserId]
 	if not data then return end
 	
@@ -121,7 +121,9 @@ Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
 	end
 	
 	local isOpening = plr:FindFirstChild("IsOpening")
-	isOpening.Value = false
+	if isOpening then
+		isOpening.Value = false
+	end
 	cratesBeingOpened[plr.UserId] = nil
 	
 	-- Pass the equipped bat so the UI maintains the correct state
@@ -130,5 +132,15 @@ Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
 	if playerBats then
 		Remotes.LoadInventory:Fire(plr, playerBats, savedEquippedBat)
 	end
+end
+
+Remotes.FinishedOpening.OnServerEvent:Connect(function(plr:Player)
+	processReward(plr)
+end)
+
+-- Grant pending reward if player leaves before clicking Continue
+local Players = game:GetService("Players")
+Players.PlayerRemoving:Connect(function(plr:Player)
+	processReward(plr)
 end)
 
