@@ -5,8 +5,9 @@ local Crates = {
 		LayoutOrder = 1
 	},
 	Premium = {
-		Currency = "Cash",
-		Amount = 100,
+		Currency = "Robux",
+		Amount = 50,
+		ProductId = 3604657771,
 		LayoutOrder = 2
 	},
 	Legendary = {
