@@ -1,5 +1,6 @@
 --Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 --Folders
 local Configs = ReplicatedStorage.Configs
@@ -13,6 +14,7 @@ local Bats = require(Configs.Bats)
 
 --Tables
 local cratesBeingOpened = {} -- [userId] = {crateType = ..., batName = ..., isDuplicate = ..., compensation = ...}
+local pendingRobuxPurchases = {} -- [userId] = crateType
 
 function rollRandomBat(crateType:string)
 	local pool = Bats[crateType]
@@ -34,42 +36,25 @@ function rollRandomBat(crateType:string)
 	return nil, nil
 end
 
-Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
-	--Checking if is opening
-	local isOpening = plr:FindFirstChild("IsOpening")
-	if isOpening.Value == true then return end
-	
-	--Checking
-	local leaderstats = plr:FindFirstChild("leaderstats")
-	if not leaderstats then return end
-	
-	local crateInfo = Crates[crateType]
-	if not crateInfo then return end
-	
-	local currencyStat = leaderstats:FindFirstChild(crateInfo.Currency)
-	if not currencyStat or currencyStat.Value < crateInfo.Amount then return end
-	
+-- Shared helper: rolls the reward, sets IsOpening, stores result, returns reward info
+local function startCrateOpening(plr:Player, crateType:string)
 	local crateToClone = CratesFolder:FindFirstChild(crateType .. "Crate")
-	if not crateToClone then return end
+	if not crateToClone then return nil end
 	
-	-- Roll the reward NOW so the client can build the animation around it
 	local batName, batData = rollRandomBat(crateType)
-	if not batName or not batData then return end
+	if not batName or not batData then return nil end
 	
-	-- Check if duplicate
 	local playerBats = plr:FindFirstChild("Bats")
 	local isDuplicate = false
 	if playerBats and playerBats:FindFirstChild(batName) then
 		isDuplicate = true
 	end
 	
-	--Deducting
-	currencyStat.Value -= crateInfo.Amount
+	local isOpening = plr:FindFirstChild("IsOpening")
+	if isOpening then
+		isOpening.Value = true
+	end
 	
-	--Opening
-	isOpening.Value = true
-	
-	-- Store the result for FinishedOpening to process
 	cratesBeingOpened[plr.UserId] = {
 		crateType = crateType,
 		batName = batName,
@@ -77,8 +62,7 @@ Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
 		compensation = batData.Compensation or 0,
 	}
 	
-	-- Return crate model + reward info so client can build the animation
-	return crateToClone, {
+	return {
 		batName = batName,
 		rarity = batData.TheRarity or "Common",
 		icon = batData.Icon or "",
@@ -86,6 +70,56 @@ Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
 		compensation = batData.Compensation or 0,
 	}
 end
+
+Remotes.BuyCrate.OnServerInvoke = function(plr:Player, crateType:string)
+	--Checking if is opening
+	local isOpening = plr:FindFirstChild("IsOpening")
+	if isOpening.Value == true then return end
+	
+	local crateInfo = Crates[crateType]
+	if not crateInfo then return end
+	
+	-- ROBUX PURCHASE BRANCH
+	if crateInfo.Currency == "Robux" then
+		if not crateInfo.ProductId then return end
+		-- Prevent double-prompting
+		if pendingRobuxPurchases[plr.UserId] then return end
+		pendingRobuxPurchases[plr.UserId] = crateType
+		MarketplaceService:PromptProductPurchase(plr, crateInfo.ProductId)
+		-- Return a signal so the client knows a purchase prompt is shown
+		return nil, { promptPurchase = true }
+	end
+	
+	-- CASH PURCHASE FLOW
+	local leaderstats = plr:FindFirstChild("leaderstats")
+	if not leaderstats then return end
+	
+	local currencyStat = leaderstats:FindFirstChild(crateInfo.Currency)
+	if not currencyStat or currencyStat.Value < crateInfo.Amount then return end
+	
+	local rewardInfo = startCrateOpening(plr, crateType)
+	if not rewardInfo then return end
+	
+	--Deducting
+	currencyStat.Value -= crateInfo.Amount
+	
+	-- Return reward info so client can build the animation
+	return rewardInfo
+end
+
+-- Called by ReceiptHandler when a Robux purchase is confirmed
+-- Rolls the reward and fires the client to start the opening animation
+Remotes.RobuxPurchaseCompleted.Event:Connect(function(plr:Player)
+	local crateType = pendingRobuxPurchases[plr.UserId]
+	if not crateType then return end
+	pendingRobuxPurchases[plr.UserId] = nil
+	
+	local rewardInfo = startCrateOpening(plr, crateType)
+	if not rewardInfo then return end
+	
+	-- Fire the client to start the opening animation
+	Remotes.RobuxCrateResult:FireClient(plr, crateType, rewardInfo)
+end)
 
 local function processReward(plr:Player)
 	local data = cratesBeingOpened[plr.UserId]
@@ -142,5 +176,5 @@ end)
 local Players = game:GetService("Players")
 Players.PlayerRemoving:Connect(function(plr:Player)
 	processReward(plr)
+	pendingRobuxPurchases[plr.UserId] = nil
 end)
-
