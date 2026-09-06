@@ -10,6 +10,7 @@ local Remotes = ReplicatedStorage:WaitForChild("CustomiseRelatedRemotes")
 --Events
 local BuyCrate = Remotes:WaitForChild("BuyCrate")
 local FinishedOpening = Remotes:WaitForChild("FinishedOpening")
+local RobuxCrateResult = Remotes:WaitForChild("RobuxCrateResult")
 
 --Modules
 local Crates = require(Configs:WaitForChild("Crates"))
@@ -277,8 +278,12 @@ function generateGui()
 		buyButton.Text = crateInfo.Currency .. ": " .. crateInfo.Amount
 		
 		buyButton.MouseButton1Click:Connect(function()
-			local crateModel, rewardInfo = BuyCrate:InvokeServer(crateType)
-			if crateModel and rewardInfo then
+			local rewardInfo = BuyCrate:InvokeServer(crateType)
+			if rewardInfo and rewardInfo.promptPurchase then
+				-- Robux purchase flow: server has prompted the purchase dialog
+				-- The opening animation will be triggered by RobuxCrateResult event
+				background.Visible = false
+			elseif rewardInfo then
 				background.Visible = false
 				openCrate(crateType, rewardInfo)
 			else
@@ -289,6 +294,11 @@ function generateGui()
 		end)
 	end
 end
+
+-- Listen for Robux crate results (fires after purchase is confirmed by ReceiptHandler)
+RobuxCrateResult.OnClientEvent:Connect(function(crateType, rewardInfo)
+	openCrate(crateType, rewardInfo)
+end)
 
 generateGui()
 
