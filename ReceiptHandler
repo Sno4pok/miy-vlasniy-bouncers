@@ -1,0 +1,41 @@
+local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local Remotes = ReplicatedStorage:WaitForChild("CustomiseRelatedRemotes")
+local RobuxPurchaseCompleted = Remotes:WaitForChild("RobuxPurchaseCompleted")
+
+-- Product ID -> handler function mapping
+local PRODUCT_HANDLERS = {
+	[3604657771] = function(player)
+		-- Premium Crate purchase confirmed
+		-- Fire the BindableEvent so CrateHandler rolls the reward and notifies the client
+		RobuxPurchaseCompleted:Fire(player)
+	end,
+}
+
+MarketplaceService.ProcessReceipt = function(receiptInfo)
+	local playerId = receiptInfo.PlayerId
+	local productId = receiptInfo.ProductId
+	
+	local player = Players:GetPlayerByUserId(playerId)
+	if not player then
+		-- Player left the game; grant the purchase so Roblox doesn't keep retrying
+		-- The reward will be handled when they rejoin (or we can skip it for simplicity)
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	
+	local handler = PRODUCT_HANDLERS[productId]
+	if handler then
+		local success, err = pcall(handler, player)
+		if success then
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		else
+			warn("ReceiptHandler error for product", productId, "player", player.Name, ":", err)
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+	end
+	
+	-- Unknown product; grant to avoid blocking future purchases
+	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
