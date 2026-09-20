@@ -1,0 +1,15 @@
+local Offers = {
+	Cash = {
+		LayoutOrder = 1,
+		Items = {
+			{ Amount = 1000,  Price = 29,   ProductId = 3713063643 },
+			{ Amount = 3500,  Price = 95,   ProductId = 3713063731 },
+			{ Amount = 8000,  Price = 209,  ProductId = 3713063851 },
+			{ Amount = 17500, Price = 439,  ProductId = 3713064458 },
+			{ Amount = 38500, Price = 899,  ProductId = 3713171933 },
+			{ Amount = 90000, Price = 1999, ProductId = 3713172010 },
+		}
+	}
+}
+
+return Offers
