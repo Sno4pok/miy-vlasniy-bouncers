@@ -21,6 +21,7 @@ local gui = script.Parent
 local crateGui = gui.Parent:WaitForChild("CrateGui")
 local background = gui:WaitForChild("Shop_Background")
 local inventory_background = gui:WaitForChild("Inventory_Background")
+local offers_background = gui:WaitForChild("Offers_Background")
 local openBtn = gui.Frame:WaitForChild("Shop_Button")
 local closeBtn = background:WaitForChild("Close_Button")
 local itemFrame = background:WaitForChild("ItemFrame")
@@ -308,5 +309,6 @@ end)
 
 openBtn.MouseButton1Click:Connect(function()
 	inventory_background.Visible = false
+	offers_background.Visible = false
 	background.Visible = true
 end)
