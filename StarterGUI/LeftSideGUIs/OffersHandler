@@ -1,0 +1,117 @@
+--Services
+local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+--Folders
+local Configs = ReplicatedStorage:WaitForChild("Configs")
+
+--Modules
+local Offers = require(Configs:WaitForChild("Offers"))
+
+--GUIs
+local gui = script.Parent
+local background = gui:WaitForChild("Offers_Background")
+local shop_background = gui:WaitForChild("Shop_Background")
+local inventory_background = gui:WaitForChild("Inventory_Background")
+local openBtn = gui.Frame:WaitForChild("Offers_Button")
+local closeBtn = background:WaitForChild("Close_Button")
+local itemFrame = background:WaitForChild("ItemFrame")
+
+--Templates
+local CARD_TEMPLATE = itemFrame:WaitForChild("Template")
+local SECTION_TEMPLATE = itemFrame:WaitForChild("SectionTemplate")
+
+local player = Players.LocalPlayer
+
+--Constants
+local BUTTON_GREEN = Color3.fromRGB(85, 255, 0)
+local BUTTON_RED = Color3.fromRGB(255, 41, 41)
+
+-- Format a number with thousands separators (1000 -> "1,000")
+local function formatNumber(n)
+	local formatted = tostring(n)
+	while true do
+		local newFormatted, count = formatted:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+		formatted = newFormatted
+		if count == 0 then break end
+	end
+	return formatted
+end
+
+local function createCard(item, layoutOrder, cardsFrame)
+	local card = CARD_TEMPLATE:Clone()
+	card.Name = "Card_" .. layoutOrder
+	card.LayoutOrder = layoutOrder
+	card.Visible = true
+
+	local header = card:FindFirstChild("Header")
+	if header then
+		header.Text = formatNumber(item.Amount) .. " Cash"
+	end
+
+	local buyButton = card:FindFirstChild("BuyButton")
+	if buyButton then
+		buyButton.Text = item.Price .. " R$"
+		buyButton.MouseButton1Click:Connect(function()
+			if item.ProductId and item.ProductId > 0 then
+				MarketplaceService:PromptProductPurchase(player, item.ProductId)
+			else
+				-- Product ID not configured yet; flash red like the shop does
+				buyButton.BackgroundColor3 = BUTTON_RED
+				task.wait(0.5)
+				buyButton.BackgroundColor3 = BUTTON_GREEN
+			end
+		end)
+	end
+
+	card.Parent = cardsFrame
+end
+
+local function createSection(sectionName, sectionData)
+	local section = SECTION_TEMPLATE:Clone()
+	section.Name = "Section_" .. sectionName
+	section.LayoutOrder = sectionData.LayoutOrder or 1
+	section.Visible = true
+
+	local sectionHeader = section:FindFirstChild("SectionHeader")
+	if sectionHeader then
+		sectionHeader.Text = sectionName
+	end
+
+	local cardsFrame = section:FindFirstChild("CardsFrame")
+	if cardsFrame then
+		for i, item in ipairs(sectionData.Items or {}) do
+			createCard(item, i, cardsFrame)
+		end
+	end
+
+	section.Parent = itemFrame
+end
+
+local function generateGui()
+	-- Collect sections and sort them by LayoutOrder for a stable display order
+	local sections = {}
+	for sectionName, sectionData in pairs(Offers) do
+		table.insert(sections, { name = sectionName, data = sectionData })
+	end
+	table.sort(sections, function(a, b)
+		return (a.data.LayoutOrder or 0) < (b.data.LayoutOrder or 0)
+	end)
+
+	for _, section in ipairs(sections) do
+		createSection(section.name, section.data)
+	end
+end
+
+generateGui()
+
+closeBtn.MouseButton1Click:Connect(function()
+	background.Visible = false
+end)
+
+openBtn.MouseButton1Click:Connect(function()
+	shop_background.Visible = false
+	inventory_background.Visible = false
+	background.Visible = true
+end)
