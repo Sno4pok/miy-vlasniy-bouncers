@@ -2,6 +2,7 @@
 local gui = script.Parent
 local background = gui:WaitForChild("Inventory_Background")
 local shop_background = gui:WaitForChild("Shop_Background")
+local offers_background = gui:WaitForChild("Offers_Background")
 local openBtn = gui.Frame:WaitForChild("Inventory_Button")
 local closeBtn = background:WaitForChild("Close_Button")
 
@@ -13,5 +14,6 @@ end)
 
 openBtn.MouseButton1Click:Connect(function()
 	shop_background.Visible = false
+	offers_background.Visible = false
 	background.Visible = true
 end)
