@@ -5,6 +5,10 @@ local Players = game:GetService("Players")
 local Remotes = ReplicatedStorage:WaitForChild("CustomiseRelatedRemotes")
 local RobuxPurchaseCompleted = Remotes:WaitForChild("RobuxPurchaseCompleted")
 
+--Modules
+local Offers = require(ReplicatedStorage:WaitForChild("Configs"):WaitForChild("Offers"))
+local RewardManager = require(script.Parent:WaitForChild("RewardManager"))
+
 -- Product ID -> handler function mapping
 local PRODUCT_HANDLERS = {
 	[3604657771] = function(player)
@@ -14,15 +18,25 @@ local PRODUCT_HANDLERS = {
 	end,
 }
 
+-- Cash offer products: ProductId -> cash amount (built from the Offers config)
+local CASH_PRODUCTS = {}
+for _, sectionData in pairs(Offers) do
+	for _, item in ipairs(sectionData.Items or {}) do
+		if item.ProductId and item.ProductId > 0 then
+			CASH_PRODUCTS[item.ProductId] = item.Amount
+		end
+	end
+end
+
 MarketplaceService.ProcessReceipt = function(receiptInfo)
 	local playerId = receiptInfo.PlayerId
 	local productId = receiptInfo.ProductId
 	
 	local player = Players:GetPlayerByUserId(playerId)
 	if not player then
-		-- Player left the game; grant the purchase so Roblox doesn't keep retrying
-		-- The reward will be handled when they rejoin (or we can skip it for simplicity)
-		return Enum.ProductPurchaseDecision.PurchaseGranted
+		-- Player left the game; ask Roblox to retry the receipt later
+		-- (it will be re-delivered when they rejoin, so the purchase is not lost)
+		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	
 	local handler = PRODUCT_HANDLERS[productId]
@@ -34,6 +48,16 @@ MarketplaceService.ProcessReceipt = function(receiptInfo)
 			warn("ReceiptHandler error for product", productId, "player", player.Name, ":", err)
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+	end
+	
+	-- Cash offers: grant cash directly via RewardManager
+	local cashAmount = CASH_PRODUCTS[productId]
+	if cashAmount then
+		local success = RewardManager.AwardCash(player, cashAmount)
+		if success then
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		end
+		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	
 	-- Unknown product; grant to avoid blocking future purchases
