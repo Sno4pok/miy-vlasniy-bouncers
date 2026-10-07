@@ -1,0 +1,174 @@
+local VotingModule = {}
+
+local Players = game:GetService("Players")
+
+-- Dependencies (set via Initialize)
+local voteEvent = nil
+local status = nil
+local gameModeValue = nil
+local inRound = nil
+local voteResultsFolder = nil
+
+-- State
+local votingActive = false
+local voteCounts = {}
+local playerVotes = {}
+local currentVotingModes = {}
+local allGameModes = {"Classic", "Team Death Match", "Insanity"}
+
+-- Initialize the module with required references
+function VotingModule.Initialize(dependencies)
+	voteEvent = dependencies.voteEvent
+	status = dependencies.status
+	gameModeValue = dependencies.gameModeValue
+	inRound = dependencies.inRound
+	voteResultsFolder = dependencies.voteResultsFolder
+end
+
+local function selectRandomModes()
+	local availableModes = {}
+	for _, mode in pairs(allGameModes) do
+		table.insert(availableModes, mode)
+	end
+	
+	local selectedModes = {}
+	for i = 1, 2 do
+		if #availableModes > 0 then
+			local randomIndex = math.random(1, #availableModes)
+			table.insert(selectedModes, availableModes[randomIndex])
+			table.remove(availableModes, randomIndex)
+		end
+	end
+	
+	return selectedModes
+end
+
+local function initializeVotes()
+	voteCounts = {}
+	playerVotes = {}
+	currentVotingModes = selectRandomModes()
+	
+	for _, mode in pairs(currentVotingModes) do
+		voteCounts[mode] = 0
+	end
+	
+	-- Clear vote results folder
+	for _, child in pairs(voteResultsFolder:GetChildren()) do
+		child:Destroy()
+	end
+	
+	-- Create IntValues for each selected mode
+	for _, mode in pairs(currentVotingModes) do
+		local voteValue = Instance.new("IntValue")
+		voteValue.Name = mode
+		voteValue.Value = 0
+		voteValue.Parent = voteResultsFolder
+	end
+end
+
+local function getWinningMode()
+	local maxVotes = 0
+	local winningModes = {}
+	
+	for mode, count in pairs(voteCounts) do
+		if count > maxVotes then
+			maxVotes = count
+			winningModes = {mode}
+		elseif count == maxVotes then
+			table.insert(winningModes, mode)
+		end
+	end
+	
+	-- If tie, pick random winner
+	if #winningModes > 1 then
+		return winningModes[math.random(1, #winningModes)]
+	end
+	
+	return winningModes[1] or "Classic"
+end
+
+-- Minimum non-AFK players needed for a round to start (shared with RoundSys)
+local MIN_PLAYERS = 2
+
+local function getEligiblePlayerCount()
+	local count = 0
+	for _, player in ipairs(Players:GetPlayers()) do
+		if not player:FindFirstChild("IsAFK") then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Exported so other server scripts (e.g. RoundSys) use the same eligibility rules
+VotingModule.MIN_PLAYERS = MIN_PLAYERS
+VotingModule.GetEligiblePlayerCount = getEligiblePlayerCount
+
+function VotingModule.StartVoting()
+	if votingActive then return false end
+	votingActive = true
+	initializeVotes()
+	
+	-- Notify all clients to show voting GUI
+	voteEvent:FireAllClients("startVoting", currentVotingModes)
+	
+	-- Voting timer
+	for i = 10, 0, -1 do
+		if not votingActive then break end
+		status.Value = "Voting: "..i.." seconds"
+		voteEvent:FireAllClients("updateTimer", i)
+		task.wait(1)
+	end
+	
+	-- Determine winner
+	local winningMode = getWinningMode()
+	gameModeValue.Value = winningMode
+	
+	-- Notify clients of winner
+	voteEvent:FireAllClients("votingEnd", winningMode)
+	status.Value = winningMode.." selected!"
+	
+	votingActive = false
+	
+	-- Do not start the round if too few eligible players remain
+	-- (someone may have left during the voting window)
+	if getEligiblePlayerCount() < MIN_PLAYERS then
+		status.Value = "Waiting for players..."
+		return false
+	end
+
+	-- Start the round after delay
+	task.wait(2)
+	inRound.Value = true
+	return true
+end
+
+function VotingModule.HandleVoteRequest(player, mode)
+	if not votingActive then return end
+	if not voteCounts[mode] then return end
+	
+	-- Remove previous vote if exists
+	if playerVotes[player] then
+		voteCounts[playerVotes[player]] = voteCounts[playerVotes[player]] - 1
+		-- Update IntValue
+		local prevValue = voteResultsFolder:FindFirstChild(playerVotes[player])
+		if prevValue then
+			prevValue.Value = voteCounts[playerVotes[player]]
+		end
+	end
+	
+	-- Add new vote
+	playerVotes[player] = mode
+	voteCounts[mode] = voteCounts[mode] + 1
+	
+	-- Update IntValue for client
+	local voteValue = voteResultsFolder:FindFirstChild(mode)
+	if voteValue then
+		voteValue.Value = voteCounts[mode]
+	end
+	
+	-- Notify clients of vote update
+	voteEvent:FireAllClients("updateVotes", voteCounts)
+end
+
+return VotingModule
