@@ -133,14 +133,15 @@ local function processReward(plr:Player)
 	local leaderstats = plr:FindFirstChild("leaderstats")
 	
 	if isDuplicate then
-		-- Duplicate! Give compensation
+		-- Duplicate! Give compensation (always paid in Cash)
 		local batData = Bats[crateType] and Bats[crateType][batName]
 		if batData and batData.Compensation then
-			local crateInfo = Crates[crateType]
-			local currencyStat = leaderstats and leaderstats:FindFirstChild(crateInfo and crateInfo.Currency or "Cash")
+			local currencyStat = leaderstats and leaderstats:FindFirstChild("Cash")
 			if currencyStat then
 				currencyStat.Value += batData.Compensation
 				print("Duplicate bat!", batName, "- Compensation:", batData.Compensation)
+			else
+				warn("Could not find Cash stat to grant duplicate compensation for", plr.Name)
 			end
 		end
 	else
@@ -177,4 +178,16 @@ local Players = game:GetService("Players")
 Players.PlayerRemoving:Connect(function(plr:Player)
 	processReward(plr)
 	pendingRobuxPurchases[plr.UserId] = nil
+end)
+
+-- If player respawns while opening, process the reward
+Players.CharacterAdded:Connect(function(character)
+	local plr = Players:GetPlayerFromCharacter(character)
+	if not plr then return end
+
+	if cratesBeingOpened[plr.UserId] then
+		processReward(plr)
+	elseif plr:FindFirstChild("IsOpening") then
+		plr.IsOpening.Value = false
+	end
 end)
